@@ -1,0 +1,43 @@
+[project]
+name = "tradecred-api"
+version = "0.1.0"
+description = "TradeCred API — Milestone 0 bootstrap"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.115,<1",
+  "uvicorn[standard]>=0.34,<1",
+  "pydantic-settings>=2.7,<3",
+  "sqlalchemy[asyncio]>=2.0,<3",
+  "psycopg[binary]>=3.2,<4",
+  "alembic>=1.14,<2",
+  "pyjwt>=2.10,<3",
+  "argon2-cffi>=23,<26",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8,<10",
+ "pytest-asyncio>=0.25,<2",
+ "httpx>=0.28,<1",
+ "ruff>=0.9,<1",
+ "mypy>=1.14,<2",
+ "httpx2>=2.13.1",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+markers = ["integration: requires a running PostgreSQL database"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "ASYNC"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+plugins = ["pydantic.mypy"]

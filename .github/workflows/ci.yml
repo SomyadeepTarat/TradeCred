@@ -1,0 +1,35 @@
+name: Milestone 0 checks
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: tradecred
+          POSTGRES_PASSWORD: tradecred_local
+          POSTGRES_DB: tradecred
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U tradecred -d tradecred"
+          --health-interval 5s --health-timeout 3s --health-retries 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.7.22"
+          python-version: "3.12"
+      - run: make install
+      - run: make test
+      - run: make lint
+      - run: make test-integration
+      - run: make build
+      - run: docker compose config --quiet

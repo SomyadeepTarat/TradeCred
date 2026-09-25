@@ -1,0 +1,36 @@
+{
+  "name": "tradecred-web",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "next dev --hostname 127.0.0.1",
+    "build": "next build && node scripts/prepare-standalone.mjs",
+    "start": "node .next/standalone/server.js",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "dependencies": {
+    "next": "^16.2.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6",
+    "@testing-library/react": "^16",
+    "@types/node": "^22",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^16.2.0",
+    "jsdom": "^28.1.0",
+    "prettier": "^3",
+    "typescript": "^5",
+    "vitest": "^4.1.11"
+  }
+}
