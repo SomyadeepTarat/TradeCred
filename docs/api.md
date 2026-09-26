@@ -1,4 +1,4 @@
-# API — Milestone 3
+# API — Milestone 4
 
 Base path: `/api/v1`. Interactive OpenAPI: `http://localhost:8000/docs`.
 
@@ -128,3 +128,30 @@ local creation/submission/verification appear in audit events. No invented histo
 created for older records. Audit log and mock history are PostgreSQL records, not a claim
 of blockchain immutability. Locking/financing and signed settlement endpoints are not
 exposed in this milestone.
+
+
+## Receivables UI read APIs
+
+`GET /receivables?status=SUBMITTED&limit=20&offset=0` and `GET /receivables/{id}` require
+EXPORTER or ADMIN. Exporters can only read their own organization. Admins can review all
+records, but `buyer_id`, `invoice_number` and `face_value` are null; PDFs remain inaccessible.
+Financier/settlement roles receive 403. Other-organization and unknown exporter IDs both
+return 404. Responses set `Cache-Control: no-store`.
+
+List returns `items`, filtered `total`, organization-scoped `summary` and up to five recent
+receivable audit events. `limit` is 1–100, `offset` 0–100000. Summary counts are independent
+of the filter: total, available (FINANCE_AVAILABLE), financed (FINANCED/OVERDUE/DISPUTED),
+settled (PAYMENT_CONFIRMED/REALIZED/EBRC_ELIGIBLE/CLOSED). Ordering is newest creation then ID.
+Exact `face_value` is a decimal string, never a JavaScript floating-point conversion.
+
+Detail additionally returns `document_available` (download permission and metadata presence),
+`available_actions` (role/state-aware submit, verify, register, open-financing) and
+`ledger_backend`. Available actions are hints; mutation routes independently enforce all
+permissions, integrity checks and transitions. File existence/integrity is confirmed by the
+existing document endpoints, not by `document_available`. Storage keys, document contents
+and private settlement references are never included in these projections.
+
+The Next.js `/api/backend/...` gateway exposes only the route allowlist needed by this UI.
+Its `auth/login` sets an HttpOnly cookie and returns `{ "signedIn": true }`, not a JWT.
+`auth/logout` deletes that cookie. Requests use same-origin cookies, with Origin/Host
+validation for POSTs. The underlying FastAPI login API continues returning JWTs to API clients.

@@ -1,7 +1,7 @@
 # TradeCred
 
 Receivable trust infrastructure for MSME trade finance, targeting NPCI Drunix.
-[The PRD](tradecred_prd_codex.md) is the source of truth. **Milestones 0–3 are implemented.**
+[The PRD](tradecred_prd_codex.md) is the source of truth. **Milestones 0–4 are implemented.**
 
 Fragmented institutional records create duplicate-financing and reconciliation risk.
 The planned solution combines deterministic fingerprints, a shared registry, financing
@@ -12,7 +12,7 @@ verify (as admin), register, and open them for financing in the explicit mock le
 ## Implemented architecture
 
 ```text
-Browser --> Next.js :3000 (milestone status page)
+Browser --> Next.js :3000 (exporter UI + same-origin session gateway)
 API client --> FastAPI :8000 --> PostgreSQL 16 :5432
                   | JWT / Argon2 / role checks
                   | organizations / users / receivable schema
@@ -23,7 +23,9 @@ seeded demo identities, JWT login, authenticated identity lookup, admin-only org
 listing, reusable role dependencies, private PDF storage, upload/download/integrity APIs,
 MockLedgerClient, lifecycle transitions, idempotent registration, registry lookup, audit history,
 tests, linting, CI, and Docker Compose.
-No frontend login/upload form or financial workflows exist yet; use Swagger or an API client.
+The frontend supports sign-in, exporter dashboard, upload, receivable detail, registry results,
+PDF integrity/download, and lifecycle actions. Administrators have a verification workspace.
+Financing and settlement workflows remain future milestones.
 
 ## Setup
 
@@ -129,7 +131,7 @@ TReDS, guarantee prevention of off-network fraud, move FX, issue e-BRC certifica
 make token state a legal assignment. Read [regulatory boundaries](docs/regulatory-boundaries.md).
 
 [Architecture](docs/architecture.md) · [Threat model](docs/threat-model.md) ·
-[Milestone 0 report](docs/milestone-0.md) · [Milestone 1 report](docs/milestone-1.md) · [Milestone 2 report](docs/milestone-2.md) · [Milestone 3 report](docs/milestone-3.md)
+[Milestone 0 report](docs/milestone-0.md) · [Milestone 1 report](docs/milestone-1.md) · [Milestone 2 report](docs/milestone-2.md) · [Milestone 3 report](docs/milestone-3.md) · [Milestone 4 report](docs/milestone-4.md)
 
 ## Uploading and verifying invoices (Milestone 2)
 
@@ -192,3 +194,56 @@ The mock survives restarts but provides neither distributed consensus nor tamper
 history. Its private table is separate from sanitized projections, not a Fabric private
 collection. Internal ledger lock/payment methods enforce invariants; financing APIs and
 signed settlement ingestion remain in their scheduled milestones.
+
+## Using the receivables UI (Milestone 4)
+
+Open http://localhost:3000 and sign in as `exporter@tradecred.demo` with the password used
+when seeding. The account selector supplies only the email; passwords are never embedded
+in the UI. An empty database displays an empty register, not synthetic financial activity.
+
+1. Choose **Create receivable**, enter invoice metadata and select an original PDF.
+2. The saved draft shows both full hashes and an actual registry check. An unavailable
+   registry displays an unknown status, never a clean result.
+3. Choose **Submit for verification**. Exporters cannot verify their own invoices.
+4. Sign out; sign in as `admin@tradecred.demo`. Open the submitted record and choose
+   **Verify invoice integrity**. The admin view hides buyer, invoice number, exact amount
+   and PDF download. Verification records an authorized decision and integrity check,
+   not commercial authenticity.
+5. Sign out; return as the exporter. Choose **Register receivable**, then optionally
+   **Open for financing**. The detail page shows the actual recorded timeline and mock IDs.
+6. Use **Check PDF integrity**, **Download PDF**, status filters and **Refresh** as needed.
+
+Dashboard counts cover all accessible records, regardless of the active table filter.
+Financed means outstanding FINANCED/OVERDUE/DISPUTED; payment-confirmed includes realized,
+e-BRC-eligible and closed. No amounts are summed across currencies. New read APIs return
+exact decimal strings to preserve 64-bit invoice amounts in JavaScript.
+
+The Next.js gateway stores the JWT in an HttpOnly, SameSite=Strict cookie and rejects
+cross-origin mutations. No JWT goes into localStorage or browser JavaScript. Sessions
+expire with the backend token; sign-out clears the cookie without revoking other tokens.
+Private responses use `Cache-Control: no-store`. HTTPS requests receive Secure cookies.
+The local prototype uses HTTP on loopback; shared deployments must terminate HTTPS and
+preserve the request scheme/Host at the Next.js server.
+
+Next.js reads `API_INTERNAL_URL` at runtime (default `http://127.0.0.1:8000`). Compose sets
+`http://api:8000`. For a custom host-side origin, export the variable before `make web`, or
+put it in `apps/web/.env.local`; the root `.env` is used by Compose/API, not automatically
+by Next.js. The origin is server-only and never exposed through a public environment variable.
+
+### Browser acceptance tests
+
+```sh
+cd apps/web
+npx playwright install chromium
+cd ../..
+make db
+make test-e2e
+```
+
+`make test-e2e` builds the production web app, creates an isolated PostgreSQL schema and
+temporary PDF storage, starts dedicated API/web servers on 8001/3001, and runs Chromium.
+It verifies upload → submit → admin verify → exporter register/open, hashes, download,
+registry result, timeline, duplicate rejection, session expiry and mobile overflow.
+The runner refuses occupied test ports and removes only its generated schema/storage.
+Screenshots are written under ignored `apps/web/test-results/`. CI installs Chromium and
+runs the same suite. No developer invoice records or files are touched.

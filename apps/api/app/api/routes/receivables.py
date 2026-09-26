@@ -1,15 +1,17 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Depends, Query, Request, Response
 from starlette.datastructures import UploadFile
 
 from app.api.dependencies import SessionDependency, SettingsDependency
 from app.core.errors import APIError
 from app.integrations.storage.local import LocalDocumentStorage
-from app.models.domain import Role, User
+from app.models.domain import ReceivableStatus, Role, User
+from app.schemas.receivable_views import ReceivableDetail, ReceivablePage
 from app.schemas.receivables import DraftResponse, IntegrityResponse
-from app.security.rbac import require_roles
+from app.security.rbac import CurrentUser, require_roles
+from app.services.receivable_queries import ReceivableQueries
 from app.services.receivable_service import ReceivableService
 
 router = APIRouter(prefix="/receivables", tags=["invoice documents"])
@@ -86,3 +88,29 @@ async def download(receivable_id: UUID, exporter: Exporter, service: Service) ->
             "Content-Security-Policy": "sandbox",
         },
     )
+
+
+@router.get("", response_model=ReceivablePage)
+async def list_receivables(
+    session: SessionDependency,
+    settings: SettingsDependency,
+    user: CurrentUser,
+    response: Response,
+    status: ReceivableStatus | None = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+    offset: Annotated[int, Query(ge=0, le=100000)] = 0,
+) -> ReceivablePage:
+    response.headers["Cache-Control"] = "no-store"
+    return await ReceivableQueries(session, settings, user).list(status, limit, offset)
+
+
+@router.get("/{receivable_id}", response_model=ReceivableDetail)
+async def receivable_detail(
+    receivable_id: UUID,
+    session: SessionDependency,
+    settings: SettingsDependency,
+    user: CurrentUser,
+    response: Response,
+) -> ReceivableDetail:
+    response.headers["Cache-Control"] = "no-store"
+    return await ReceivableQueries(session, settings, user).detail(receivable_id)

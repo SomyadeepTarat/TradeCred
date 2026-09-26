@@ -1,7 +1,7 @@
 [project]
 name = "tradecred-api"
-version = "0.4.0"
-description = "TradeCred API — Mock ledger and registry"
+version = "0.5.0"
+description = "TradeCred API — Receivables workspace"
 requires-python = ">=3.12"
 dependencies = [
   "fastapi>=0.115,<1",

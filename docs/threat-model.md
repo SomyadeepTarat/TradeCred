@@ -1,7 +1,7 @@
 # Threat model
 
-Bootstrap and Milestone 2 domain/authentication/document services exist. The controls below distinguish current behavior from
-required future protections; none of the planned business controls is claimed as implemented.
+Milestones 0–4 provide authentication, document integrity, mock ledger state enforcement
+and the receivables UI. The controls below distinguish implemented behavior from future protections.
 
 | Threat | Required mitigation and implementation milestone |
 | --- | --- |
@@ -26,3 +26,15 @@ keys; storage rejects arbitrary keys and symlinks. These controls are not malwar
 or a sandboxed PDF parser. Host/storage administrators can still read local bytes; at-rest
 encryption and hardened parser isolation are not implemented. Filesystem/DB crash windows
 can leave orphan files requiring reconciliation; uncertain commits never report success.
+
+
+## Browser session boundary (Milestone 4)
+
+JWTs are held in HttpOnly, SameSite=Strict cookies by the same-origin Next.js gateway.
+Cookie-authenticated POSTs require a matching Origin/Host and only an explicit endpoint
+allowlist is proxied. Browser-supplied Authorization headers are ignored. Server responses
+for private data disable caching; PDF integrity failures retain their non-success status.
+Cookies become Secure for HTTPS requests. Local development binds to loopback; production
+TLS/proxy policy, CSP hardening, rate limiting and session revocation remain future work.
+Role/organization checks happen at FastAPI on every request. Client-visible action hints
+are not authorization. UI reads omit private fields for admins and reject non-owner exporters.

@@ -1,7 +1,7 @@
 # Architecture and implementation status
 
-Milestones 0–3 provide Next.js, FastAPI and PostgreSQL 16. The frontend displays
-milestone scope; authentication is currently available through the API and Swagger UI.
+Milestones 0–4 provide Next.js, FastAPI and PostgreSQL 16. The frontend provides an
+exporter workspace and a sanitized administrator verification view.
 
 FastAPI creates an async SQLAlchemy engine during lifespan and disposes it on shutdown.
 Requests receive scoped sessions. Routes delegate authentication to AuthService and user
@@ -70,3 +70,21 @@ transaction with their audit; rejected duplicates are recorded after rollback. E
 pre-Milestone-3 records are not backfilled with invented history. Authentication/security
 hardening remains future work. Application routes do not expose audit updates or deletes;
 a database administrator can still alter the mock tables.
+
+
+Milestone 4 adds paginated, organization-scoped query services without changing the database
+schema. The API owns amount formatting, summary aggregation and role/state-aware action
+availability. Exact private values remain available only to the owning exporter. Existing
+mutation services remain the authority for transitions.
+
+The browser uses a same-origin Next.js route handler. A narrow route allowlist forwards
+requests to runtime API_INTERNAL_URL. An HttpOnly, SameSite=Strict cookie holds the JWT;
+browser code receives no bearer token. Mutation origins are checked, upstream errors keep
+their status, expired tokens clear the cookie and all gateway responses disable caching.
+Multipart bytes retain their original content type/boundary; request bodies are bounded at
+50 MiB plus 64 KiB before forwarding, and the API enforces its configured PDF limit.
+
+The interface fetches persisted data, refreshes after successful actions, and represents
+loading, empty, unauthorized and unavailable states explicitly. History entries come from
+audit records/ledger revisions, not inferred completion of a preset timeline. Browser
+acceptance tests run against real temporary API, PostgreSQL and production Next.js servers.

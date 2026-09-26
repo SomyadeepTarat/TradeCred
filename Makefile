@@ -1,7 +1,7 @@
 API = cd apps/api && uv run --frozen
 WEB = npm --prefix apps/web
 
-.PHONY: install dev api web db test test-api test-web test-integration test-chaincode lint format build migrate seed demo reset
+.PHONY: install dev api web db test test-api test-web test-integration test-e2e test-chaincode lint format build migrate seed demo reset
 install:
 	uv sync --frozen --project apps/api
 	$(WEB) ci
@@ -30,17 +30,17 @@ test-integration:
 	$(API) pytest -m integration
 
 lint:
-	$(API) ruff check . ../../scripts/seed_demo.py
-	$(API) ruff format --check . ../../scripts/seed_demo.py
+	$(API) ruff check . ../../scripts/seed_demo.py ../../scripts/test_ui.py
+	$(API) ruff format --check . ../../scripts/seed_demo.py ../../scripts/test_ui.py
 	$(API) mypy app
 	$(WEB) run lint
 	$(WEB) run typecheck
 	$(WEB) run format:check
 
 format:
-	$(API) ruff format . ../../scripts/seed_demo.py
-	$(API) ruff check --fix . ../../scripts/seed_demo.py
-	$(API) ruff format . ../../scripts/seed_demo.py
+	$(API) ruff format . ../../scripts/seed_demo.py ../../scripts/test_ui.py
+	$(API) ruff check --fix . ../../scripts/seed_demo.py ../../scripts/test_ui.py
+	$(API) ruff format . ../../scripts/seed_demo.py ../../scripts/test_ui.py
 	$(WEB) run format
 
 build:
@@ -53,5 +53,8 @@ seed:
 	uv run --frozen --project apps/api python scripts/seed_demo.py
 
 test-chaincode demo reset:
-	@echo "$@ is not available in Milestone 3; see README.md for milestone scope."
+	@echo "$@ is not available in Milestone 4; see README.md for milestone scope."
 	@exit 2
+
+test-e2e: build
+	uv run --frozen --project apps/api python scripts/test_ui.py
