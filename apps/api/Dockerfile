@@ -4,7 +4,9 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev
 COPY app ./app
-RUN useradd --create-home tradecred
+COPY alembic.ini ./
+COPY migrations ./migrations
+RUN useradd --create-home tradecred && mkdir -p /data/documents && chown tradecred:tradecred /data/documents && chmod 700 /data/documents
 USER tradecred
 EXPOSE 8000
 CMD [".venv/bin/uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -13,7 +13,8 @@ router = APIRouter(prefix="/organizations", tags=["organizations"])
 
 @router.get("", response_model=list[OrganizationResponse])
 async def list_organizations(
-    admin: Annotated[User, Depends(require_roles(Role.ADMIN))], session: SessionDependency,
+    admin: Annotated[User, Depends(require_roles(Role.ADMIN))],
+    session: SessionDependency,
 ) -> list[OrganizationResponse]:
     organizations = await UserRepository(session).organizations()
     return [OrganizationResponse.model_validate(org) for org in organizations]

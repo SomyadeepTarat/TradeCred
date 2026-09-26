@@ -9,7 +9,8 @@ class APIError(Exception):
         self.message = message
 
 
-async def api_error_handler(request: Request, exc: APIError) -> JSONResponse:
+async def api_error_handler(request: Request, exc: Exception) -> JSONResponse:
+    assert isinstance(exc, APIError)
     headers = {"WWW-Authenticate": "Bearer"} if exc.status_code == 401 else None
     return JSONResponse(
         status_code=exc.status_code,

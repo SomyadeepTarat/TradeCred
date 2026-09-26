@@ -3,7 +3,15 @@ from datetime import date, datetime
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
-    BigInteger, Boolean, CheckConstraint, Date, DateTime, Enum, ForeignKey, String, func,
+    BigInteger,
+    Boolean,
+    CheckConstraint,
+    Date,
+    DateTime,
+    Enum,
+    ForeignKey,
+    String,
+    func,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -12,21 +20,21 @@ class Base(DeclarativeBase):
     pass
 
 
-class Role(str, enum.Enum):
+class Role(enum.StrEnum):
     EXPORTER = "EXPORTER"
     FINANCIER = "FINANCIER"
     SETTLEMENT_OPERATOR = "SETTLEMENT_OPERATOR"
     ADMIN = "ADMIN"
 
 
-class OrganizationType(str, enum.Enum):
+class OrganizationType(enum.StrEnum):
     EXPORTER = "EXPORTER"
     FINANCIER = "FINANCIER"
     SETTLEMENT_BANK = "SETTLEMENT_BANK"
     CONSORTIUM = "CONSORTIUM"
 
 
-class ReceivableStatus(str, enum.Enum):
+class ReceivableStatus(enum.StrEnum):
     DRAFT = "DRAFT"
     SUBMITTED = "SUBMITTED"
     VERIFIED = "VERIFIED"
@@ -63,7 +71,9 @@ class Organization(Timestamps, Base):
 
 class User(Timestamps, Base):
     __tablename__ = "users"
-    __table_args__ = (CheckConstraint("email = lower(trim(email))", name="ck_users_email_canonical"),)
+    __table_args__ = (
+        CheckConstraint("email = lower(trim(email))", name="ck_users_email_canonical"),
+    )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     email: Mapped[str] = mapped_column(String(254), unique=True)
@@ -107,9 +117,26 @@ class Receivable(Timestamps, Base):
     invoice_fingerprint: Mapped[str | None] = mapped_column(String(64), unique=True)
     status: Mapped[ReceivableStatus] = mapped_column(
         Enum(ReceivableStatus, name="receivable_status"),
-        default=ReceivableStatus.DRAFT, server_default="DRAFT",
+        default=ReceivableStatus.DRAFT,
+        server_default="DRAFT",
     )
     owner_org_id: Mapped[str | None] = mapped_column(ForeignKey("organizations.id"), index=True)
     financing_agreement_hash: Mapped[str | None] = mapped_column(String(64))
     settlement_reference: Mapped[str | None] = mapped_column(String(160))
     ebrc_status: Mapped[str | None] = mapped_column(String(80))
+
+
+class Document(Base):
+    __tablename__ = "documents"
+    __table_args__ = (
+        CheckConstraint("size_bytes > 0", name="ck_documents_positive_size"),
+        CheckConstraint("document_hash ~ '^[a-f0-9]{64}$'", name="ck_documents_hash"),
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    receivable_id: Mapped[UUID] = mapped_column(ForeignKey("receivables.id"), unique=True)
+    uploaded_by_user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
+    storage_key: Mapped[str] = mapped_column(String(40), unique=True)
+    document_hash: Mapped[str] = mapped_column(String(64))
+    size_bytes: Mapped[int] = mapped_column(BigInteger)
+    content_type: Mapped[str] = mapped_column(String(40), default="application/pdf")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

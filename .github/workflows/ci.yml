@@ -1,10 +1,13 @@
-name: Milestone 0 checks
+name: TradeCred checks
 on: [push, pull_request]
 permissions:
   contents: read
 jobs:
   check:
     runs-on: ubuntu-latest
+    env:
+      JWT_SECRET: tradecred-ci-only-signing-key-0123456789
+      DEMO_PASSWORD: TradeCred-CI-2026!
     services:
       postgres:
         image: postgres:16-alpine
@@ -30,6 +33,8 @@ jobs:
       - run: make install
       - run: make test
       - run: make lint
+      - run: make migrate
+      - run: make seed
       - run: make test-integration
       - run: make build
       - run: docker compose config --quiet

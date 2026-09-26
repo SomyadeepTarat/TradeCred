@@ -3,7 +3,7 @@ export default function Home() {
     <main>
       <header>
         <span className="brand">TradeCred</span>
-        <span className="badge">Milestone 0 · Bootstrap</span>
+        <span className="badge">Milestone 2 · Documents</span>
       </header>
       <section aria-labelledby="title">
         <p className="eyebrow">FOR MSME TRADE FINANCE</p>
@@ -13,11 +13,12 @@ export default function Home() {
           and authenticated settlement records.
         </p>
         <div className="panel">
-          <h2>Development foundation</h2>
+          <h2>Invoice integrity</h2>
           <p>
-            The Next.js frontend, FastAPI service, and PostgreSQL configuration
-            are in place. Authentication and receivable workflows arrive in
-            later milestones.
+            Exporters can upload invoice PDFs through the API, create draft
+            receivables, and verify document integrity. Business fingerprints
+            are independent of file hashes. Ledger registration arrives in the
+            next milestone.
           </p>
           <p className="notice">
             Prototype only. No live ledger or payment connection.

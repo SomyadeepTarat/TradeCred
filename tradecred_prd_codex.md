@@ -1985,74 +1985,8 @@ Prototype is complete when:
 
 ---
 
-# 51. Hackathon Demo Script
 
-## Opening
-
-“TradeCred is a Drunix-based shared receivables trust layer for MSME trade finance. We use tokenization not to create a speculative asset, but to establish a shared, auditable financing and settlement state across institutions.”
-
-## Demo 1
-
-- Log in as exporter.
-- Upload invoice.
-- Show fingerprint.
-- Show clear registry result.
-- Register.
-- Open for financing.
-- Switch to bank.
-- Submit offer.
-- Switch to exporter.
-- Accept.
-- Show LOCKED -> FINANCED.
-- Show agreement hash.
-
-## Demo 2
-
-- Open registry checker.
-- Enter same invoice.
-- Show FINANCED.
-- Try financing again.
-- Show blocked result.
-
-Narration:
-
-“TradeCred only guarantees this across participating institutions. The registry API is designed so banks or TReDS platforms can query this state before disbursement.”
-
-## Demo 3
-
-- Open settlement simulator.
-- Send invalid signature.
-- Show rejection.
-- Send replay event.
-- Show rejection.
-- Send valid event.
-- Show PAYMENT_CONFIRMED -> REALIZED.
-
-Narration:
-
-“TradeCred does not execute forex movement. It consumes an authenticated payment event from a regulated settlement participant and updates the receivable state.”
-
-## Close
-
-- Show audit timeline.
-- Show architecture.
-- Show Drunix ledger state versus private data.
-
----
-
-# 52. Submission Copy Reference
-
-## Proposal Title
-
-**TradeCred — A Drunix-Based Tokenized Receivables & Settlement Infrastructure for MSME Trade Finance**
-
-## One-Line Description
-
-A permissioned receivables trust layer that enables deterministic invoice deduplication, institutional financing locks, auditable assignment state, and authenticated settlement events using Drunix.
-
----
-
-# 53. Final Product Principles
+# 51. Final Product Principles
 
 TradeCred must optimize for:
 

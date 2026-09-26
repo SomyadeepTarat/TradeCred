@@ -19,7 +19,14 @@ services:
     build: ./apps/api
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-tradecred}:${POSTGRES_PASSWORD:-tradecred_local}@postgres:5432/${POSTGRES_DB:-tradecred}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      JWT_ACCESS_TOKEN_MINUTES: ${JWT_ACCESS_TOKEN_MINUTES:-30}
+      DOCUMENT_STORAGE_PATH: /data/documents
+      MAX_UPLOAD_BYTES: ${MAX_UPLOAD_BYTES:-10485760}
       LEDGER_BACKEND: ${LEDGER_BACKEND:-mock}
+    volumes:
+      - document_data:/data/documents
+    command: ["sh", "-c", ".venv/bin/alembic upgrade head && exec .venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000"]
     ports:
       - "127.0.0.1:8000:8000"
     depends_on:
@@ -41,3 +48,4 @@ services:
       retries: 6
 volumes:
   postgres_data:
+  document_data:

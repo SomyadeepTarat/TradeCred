@@ -4,7 +4,7 @@
 2. Foreign exchange movement is performed outside TradeCred.
 3. Actual remittance is assumed to occur through regulated banking channels.
 4. The intended settlement flow consumes authenticated payment confirmation only;
-   it is not implemented in Milestone 0.
+   it is not implemented in Milestone 1.
 5. TradeCred does not issue legal e-BRC certificates.
 6. Future versions may expose eligibility/status for downstream exporter workflows.
 7. Token state is not itself a legal assignment of a receivable.
@@ -15,4 +15,4 @@
 
 TradeCred does not replace TReDS or guarantee prevention of off-network fraud. AD banks
 and remittance providers remain regulated intermediaries. Actual DGFT and RBI workflows
-are outside the prototype scope. No live payment or ledger integration exists in this bootstrap.
+are outside the prototype scope. No live payment or ledger integration exists in this milestone.
