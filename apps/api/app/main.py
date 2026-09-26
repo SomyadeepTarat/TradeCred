@@ -1,7 +1,7 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI  # type: ignore[reportMissingImports]
 
 from app.api.routes.auth import router as auth_router
 from app.api.routes.health import router
