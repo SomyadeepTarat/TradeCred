@@ -12,6 +12,7 @@ from app.integrations.storage.base import DocumentStorage, DocumentTooLargeError
 from app.models.domain import Document, Receivable, ReceivableStatus, User
 from app.repositories.receivables import ReceivableRepository
 from app.schemas.receivables import DraftResponse, IntegrityResponse, InvoiceMetadata
+from app.services.audit_service import record_audit
 from app.services.document_service import validate_pdf
 from app.services.fingerprint_service import (
     amount_to_minor,
@@ -22,7 +23,14 @@ from app.services.fingerprint_service import (
 
 
 class ReceivableService:
-    def __init__(self, session: AsyncSession, storage: DocumentStorage, settings: Settings) -> None:
+    def __init__(
+        self,
+        session: AsyncSession,
+        storage: DocumentStorage,
+        settings: Settings,
+        request_id: str | None = None,
+    ) -> None:
+        self.request_id = request_id or str(uuid4())
         self.session = session
         self.repository = ReceivableRepository(session)
         self.storage = storage
@@ -78,12 +86,28 @@ class ReceivableService:
             size_bytes=len(data),
             content_type="application/pdf",
         )
+        actor_id, actor_org = user.id, user.organization_id
         try:
             await self.repository.add_draft(draft, document)
         except IntegrityError as exc:
             await self.session.rollback()
             constraint = getattr(getattr(exc.orig, "diag", None), "constraint_name", None)
             if constraint == "receivables_invoice_fingerprint_key":
+                record_audit(
+                    self.session,
+                    "DUPLICATE_REJECTED",
+                    actor_user_id=actor_id,
+                    actor_org_id=actor_org,
+                    request_id=self.request_id,
+                    metadata={"fingerprint": fingerprint, "reason": "LOCAL_DUPLICATE"},
+                )
+                try:
+                    await self.session.commit()
+                except SQLAlchemyError as audit_error:
+                    await self.session.rollback()
+                    raise APIError(
+                        503, "DATABASE_UNAVAILABLE", "Could not record duplicate rejection."
+                    ) from audit_error
                 raise APIError(
                     409, "DUPLICATE_RECEIVABLE", "This invoice is already recorded locally."
                 ) from exc
@@ -99,6 +123,15 @@ class ReceivableService:
                 503, "DOCUMENT_STORAGE_UNAVAILABLE", "The document could not be stored."
             ) from exc
         try:
+            record_audit(
+                self.session,
+                "RECEIVABLE_CREATED",
+                actor_user_id=actor_id,
+                actor_org_id=actor_org,
+                request_id=self.request_id,
+                receivable_id=receivable_id,
+                metadata={"fingerprint": fingerprint, "toStatus": "DRAFT"},
+            )
             await self.session.commit()
         except SQLAlchemyError as exc:
             await self.session.rollback()

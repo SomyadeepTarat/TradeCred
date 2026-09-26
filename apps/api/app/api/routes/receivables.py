@@ -17,10 +17,13 @@ Exporter = Annotated[User, Depends(require_roles(Role.EXPORTER))]
 
 
 def get_receivable_service(
-    session: SessionDependency, settings: SettingsDependency
+    session: SessionDependency, settings: SettingsDependency, request: Request
 ) -> ReceivableService:
     return ReceivableService(
-        session, LocalDocumentStorage(settings.document_storage_path), settings
+        session,
+        LocalDocumentStorage(settings.document_storage_path),
+        settings,
+        request.state.request_id,
     )
 
 

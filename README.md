@@ -1,12 +1,13 @@
 # TradeCred
 
 Receivable trust infrastructure for MSME trade finance, targeting NPCI Drunix.
-[The PRD](tradecred_prd_codex.md) is the source of truth. **Milestones 0, 1 and 2 are implemented.**
+[The PRD](tradecred_prd_codex.md) is the source of truth. **Milestones 0–3 are implemented.**
 
 Fragmented institutional records create duplicate-financing and reconciliation risk.
 The planned solution combines deterministic fingerprints, a shared registry, financing
 locks, agreement hashes and authenticated settlement records. Financing and settlement workflows are not implemented yet. Exporters can now create
-drafts by uploading PDFs with deterministic invoice fingerprints and integrity hashes.
+drafts by uploading PDFs with deterministic invoice fingerprints and integrity hashes, then submit,
+verify (as admin), register, and open them for financing in the explicit mock ledger.
 
 ## Implemented architecture
 
@@ -20,6 +21,7 @@ API client --> FastAPI :8000 --> PostgreSQL 16 :5432
 Implemented: liveness/readiness, organization/user/receivable/document SQL models, Alembic migrations,
 seeded demo identities, JWT login, authenticated identity lookup, admin-only organization
 listing, reusable role dependencies, private PDF storage, upload/download/integrity APIs,
+MockLedgerClient, lifecycle transitions, idempotent registration, registry lookup, audit history,
 tests, linting, CI, and Docker Compose.
 No frontend login/upload form or financial workflows exist yet; use Swagger or an API client.
 
@@ -60,7 +62,7 @@ default (`JWT_ACCESS_TOKEN_MINUTES`, allowed range 1–60).
 `POSTGRES_*` configure Compose. `DATABASE_URL` configures host-side API/migration/seed
 commands; use `postgresql+psycopg://`. Compose overrides the API's database host to
 `postgres`. Existing volumes retain their original PostgreSQL credentials.
-Future Drunix, document, and bank settings remain reserved in `.env.example`.
+Drunix and bank settings remain reserved in `.env.example`.
 
 ## Demo identities and authentication
 
@@ -107,12 +109,13 @@ localhost. Both API and web containers run without root. Health endpoints:
 
 ## Boundaries and limitations
 
-- The upload API saves DRAFT receivables with both hashes and no asset ID. It does not
-  submit, verify or register on a ledger. Existing unpopulated drafts remain valid.
-- `LEDGER_BACKEND=mock` selects the future explicit MockLedgerClient (Milestone 3).
-  No ledger transactions are attempted or reported as successful now.
+- Upload creates DRAFT receivables. Separate lifecycle endpoints require a stored, intact
+  PDF before submission, verification and registration. Legacy drafts without PDFs cannot advance.
+- `LEDGER_BACKEND=mock` uses PostgreSQL-backed MockLedgerClient. Responses identify
+  `backend: mock` and transaction IDs start with `MOCK-`. This is a simulation.
 - `LEDGER_BACKEND=drunix` reserves the future gateway configuration. Chaincode is
-  Milestone 7 and the gateway is Milestone 8; there is no silent fallback.
+  Milestone 7 and the gateway is Milestone 8. Ledger-dependent calls return 503 now;
+  there is no silent fallback.
 - `make demo`, `make reset`, and `make test-chaincode` deliberately exit nonzero until
   their real implementations arrive. No payments or settlements exist yet.
 - Authentication has no registration, password-reset, refresh-token, or logout-revocation
@@ -126,7 +129,7 @@ TReDS, guarantee prevention of off-network fraud, move FX, issue e-BRC certifica
 make token state a legal assignment. Read [regulatory boundaries](docs/regulatory-boundaries.md).
 
 [Architecture](docs/architecture.md) · [Threat model](docs/threat-model.md) ·
-[Milestone 0 report](docs/milestone-0.md) · [Milestone 1 report](docs/milestone-1.md) · [Milestone 2 report](docs/milestone-2.md)
+[Milestone 0 report](docs/milestone-0.md) · [Milestone 1 report](docs/milestone-1.md) · [Milestone 2 report](docs/milestone-2.md) · [Milestone 3 report](docs/milestone-3.md)
 
 ## Uploading and verifying invoices (Milestone 2)
 
@@ -164,4 +167,28 @@ Read [TC-FP-1](docs/fingerprinting.md) for normalization and the fixed test vect
 Filesystem writes and PostgreSQL commits cannot be atomic. Handled storage failures
 roll back the draft; an uncertain commit returns 503 and retains the file. A crash or
 uncertain commit can leave an orphan requiring manual reconciliation; no cleanup job
-or idempotent registration workflow is claimed in this milestone.
+exists yet. Ledger registration retries are idempotent; PDF uploads remain duplicate-rejected.
+
+## Mock ledger lifecycle (Milestone 3)
+
+Using `/docs` or an API client, upload an invoice as the exporter, then:
+
+1. Exporter: `POST /api/v1/receivables/{id}/submit`.
+2. Administrator: `POST /api/v1/receivables/{id}/verify`.
+3. Exporter or administrator: `POST /api/v1/receivables/{id}/register`.
+4. Exporter: `POST /api/v1/receivables/{id}/open-financing`.
+5. Owner or administrator: `GET /api/v1/receivables/{id}/history`.
+
+Any authenticated participant can call `POST /api/v1/registry/check` with the canonical
+invoice inputs (integer `amountMinor`) or `GET /api/v1/registry/fingerprint/{fingerprint}`.
+See [API details](docs/api.md). Registry results expose status and asset ID without exact
+amounts, buyer details, PDFs or storage keys. Eligibility is informational, not credit approval.
+Admin audit records are available at `GET /api/v1/audit/events`.
+
+The mock ledger, application projection and successful lifecycle audit commit in one
+PostgreSQL transaction. Concurrent fingerprint registration and asset locks are serialized.
+Registration retries return the original receipt without rewinding the current status.
+The mock survives restarts but provides neither distributed consensus nor tamper-proof
+history. Its private table is separate from sanitized projections, not a Fabric private
+collection. Internal ledger lock/payment methods enforce invariants; financing APIs and
+signed settlement ingestion remain in their scheduled milestones.

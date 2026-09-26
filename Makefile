@@ -53,5 +53,5 @@ seed:
 	uv run --frozen --project apps/api python scripts/seed_demo.py
 
 test-chaincode demo reset:
-	@echo "$@ is not available in Milestone 1; see README.md for milestone scope."
+	@echo "$@ is not available in Milestone 3; see README.md for milestone scope."
 	@exit 2

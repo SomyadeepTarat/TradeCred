@@ -3,7 +3,7 @@ export default function Home() {
     <main>
       <header>
         <span className="brand">TradeCred</span>
-        <span className="badge">Milestone 2 · Documents</span>
+        <span className="badge">Milestone 3 · Mock ledger</span>
       </header>
       <section aria-labelledby="title">
         <p className="eyebrow">FOR MSME TRADE FINANCE</p>
@@ -13,12 +13,12 @@ export default function Home() {
           and authenticated settlement records.
         </p>
         <div className="panel">
-          <h2>Invoice integrity</h2>
+          <h2>Mock registry and audit history</h2>
           <p>
-            Exporters can upload invoice PDFs through the API, create draft
-            receivables, and verify document integrity. Business fingerprints
-            are independent of file hashes. Ledger registration arrives in the
-            next milestone.
+            The API supports invoice submission, administrator verification,
+            registration in the mock ledger, duplicate checks, and audit
+            history. Mock transactions are explicitly identified. The
+            receivables interface arrives in the next milestone.
           </p>
           <p className="notice">
             Prototype only. No live ledger or payment connection.

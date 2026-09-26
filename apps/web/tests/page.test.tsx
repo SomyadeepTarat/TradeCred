@@ -7,7 +7,7 @@ test("identifies the current milestone scope without claiming working financial 
   expect(
     screen.getByRole("heading", { name: "Receivable trust infrastructure" }),
   ).toBeVisible();
-  expect(screen.getByText("Milestone 2 · Documents")).toBeVisible();
+  expect(screen.getByText("Milestone 3 · Mock ledger")).toBeVisible();
   expect(
     screen.getByText(/No live ledger or payment connection/),
   ).toBeVisible();

@@ -1,4 +1,4 @@
-# API — Milestone 2
+# API — Milestone 3
 
 Base path: `/api/v1`. Interactive OpenAPI: `http://localhost:8000/docs`.
 
@@ -42,8 +42,8 @@ Codes: `AUTHENTICATION_REQUIRED` (401), `INVALID_TOKEN` (401),
 `INVALID_CREDENTIALS` (401), `UNAUTHORIZED_ROLE` (403). Authentication errors include
 `WWW-Authenticate: Bearer`. Request validation retains FastAPI's 422 format for now.
 
-Receivable lifecycle, financing, settlement and registry endpoints are not implemented. No endpoint
-claims a ledger write, payment or regulatory workflow succeeded.
+The mock lifecycle and registry endpoints below are available. Financing and settlement
+APIs remain future milestones; no endpoint reports a live Drunix transaction or payment.
 
 ## Invoice documents
 
@@ -70,5 +70,61 @@ Additional error codes: `INVALID_UPLOAD` / `INVALID_INVOICE_METADATA` / `INVALID
 and excess form parts use the framework's 400 response. The request limit applies before
 multipart spooling; the PDF limit is also checked independently.
 
-A duplicate response only means the invoice already exists in the local database.
-The consortium registry, ledger state and financing eligibility are Milestone 3+.
+Upload duplicates refer to the local database. Registration additionally checks the
+selected ledger registry, rejecting fingerprints already registered to another asset.
+
+
+## Mock ledger, registry and audit
+
+All routes below require authentication. `LEDGER_BACKEND=mock` is the implemented adapter.
+`drunix` returns `LEDGER_UNAVAILABLE` (503) for ledger-dependent operations. Every request
+gets a server-generated `X-Request-ID`; clients cannot choose audit correlation IDs.
+
+| Method | Path | Access / behavior |
+| --- | --- | --- |
+| POST | `/receivables/{id}/submit` | Owner exporter; DRAFT → SUBMITTED |
+| POST | `/receivables/{id}/verify` | ADMIN; SUBMITTED → VERIFIED |
+| POST | `/receivables/{id}/register` | Owner exporter or ADMIN; VERIFIED → REGISTERED, idempotent retry |
+| POST | `/receivables/{id}/open-financing` | Owner exporter; REGISTERED → FINANCE_AVAILABLE |
+| GET | `/receivables/{id}/history` | Owner exporter or ADMIN; application audit and ledger revisions |
+| POST | `/registry/check` | Any participant; normalized business inputs |
+| GET | `/registry/fingerprint/{fingerprint}` | Any participant; 64 lowercase hex SHA-256 |
+| GET | `/audit/events?limit=100&offset=0` | ADMIN; newest first, limit 1–500, offset 0–10000 |
+
+Lifecycle POSTs have no body. Submission, verification and first registration rehash the
+stored document and invoice identity. Verification is an explicit administrator action
+plus integrity checks, not external commercial verification. This permission does not
+grant the administrator raw-PDF download access.
+
+Lifecycle response fields: `id`, `status`, `asset_id`, `transaction_id`, `backend`, `replayed`.
+Submit/verify have no ledger receipt (`transaction_id` and `backend` are null). Registration
+and opening return `backend: "mock"`, a stable `TC-…` asset ID, and `MOCK-…` transaction ID
+only after commit. Retrying registration returns the original registration transaction ID
+with `replayed: true` and the **current** ledger status; it adds no extra transaction/audit.
+Other invalid or repeated transitions return `INVALID_STATE_TRANSITION` (409).
+
+Registry request example:
+
+```json
+{"exporterId":"ORG_EXPORTER_ALPHA","buyerId":"BUYER-DE-001","invoiceNumber":"EXP-2026-1042","currency":"EUR","amountMinor":1080000,"invoiceDate":"2026-09-21"}
+```
+
+Uses the same TC-FP-1 normalization as upload. Floats, extra fields, malformed dates and
+invalid currencies are rejected. Response keys: `fingerprint`, `exists`, `eligible`,
+`locked`, `financed`, `backend`, and, when present, `assetId`, `status`, `reason`.
+Absent fingerprints return `exists: false, eligible: true`: no registered asset was found,
+not proof that there is no local draft or off-network financing. Existing assets are
+eligible only at FINANCE_AVAILABLE. Locked/financed assets are ineligible. No response
+includes the exact amount, buyer ID, filename, storage key, PDF or private settlement reference.
+
+Duplicate registration returns 409 `DUPLICATE_RECEIVABLE` with the existing `assetId` and
+`status` in `error.details`. Conflicting reuse of an asset ID returns 409
+`REGISTRATION_CONFLICT`. Storage/integrity or transaction failures never return success.
+
+History contains `events` (event type, actor user/org, receivable/asset IDs, request ID,
+allowlisted metadata, timestamp) and `ledger` (mock transaction ID, asset, revision,
+from/to status, actor org, timestamp, backend). Ledger revisions begin at registration;
+local creation/submission/verification appear in audit events. No invented history is
+created for older records. Audit log and mock history are PostgreSQL records, not a claim
+of blockchain immutability. Locking/financing and signed settlement endpoints are not
+exposed in this milestone.

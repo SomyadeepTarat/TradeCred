@@ -1,6 +1,6 @@
 # Architecture and implementation status
 
-Milestones 0, 1 and 2 provide Next.js, FastAPI and PostgreSQL 16. The frontend displays
+Milestones 0–3 provide Next.js, FastAPI and PostgreSQL 16. The frontend displays
 milestone scope; authentication is currently available through the API and Swagger UI.
 
 FastAPI creates an async SQLAlchemy engine during lifespan and disposes it on shutdown.
@@ -11,8 +11,8 @@ current role, organization and active flag are read from the database on every r
 
 Alembic migration 0001 creates organizations, users and receivables, PostgreSQL enums,
 foreign keys, canonical-email/unique constraints, positive amounts, dates and hash checks.
-Asset IDs and hashes are nullable for drafts. SQL constraints do not yet implement a
-lifecycle transition matrix: only draft creation exists in this milestone.
+Asset IDs and hashes are nullable for drafts. A shared Python transition matrix enforces
+the PRD lifecycle, with row locks around mutations.
 The upload service validates ISO-4217 codes and exact currency minor units.
 
 Compose applies migrations before API startup. Seed runs separately in one transaction
@@ -23,10 +23,9 @@ consortium administration organization. Four users cover all four roles.
 PostgreSQL persists in a named volume. API/web containers run without root and published
 ports are loopback-only. JWT secrets come from configuration, never generated per worker.
 
-Future milestones add the explicit MockLedgerClient and DrunixLedgerClient,
-private ledger collections and sanitized global state,
-and authenticated external settlement events. No ledger writes or fallback behavior are
-implemented here. Reserved directories are not executable integration stubs.
+Milestone 3 adds LedgerClient and a PostgreSQL-backed MockLedgerClient. DrunixLedgerClient,
+Fabric private collections and authenticated external settlement events remain future work.
+Selecting Drunix returns 503 for ledger operations, without a mock fallback.
 
 
 Milestone 2 adds multipart upload -> canonical identity / PDF validation -> DRAFT and
@@ -45,3 +44,29 @@ Storage and DB are not one atomic system. Flush/constraint failure writes no fil
 handled storage failure rolls back the DB transaction. Uncertain commit preserves bytes
 and returns an error, allowing manual reconciliation instead of deleting possibly
 referenced data. Process crashes can leave orphans. This milestone has no cleanup worker.
+
+
+Milestone 3 adds migration 0003: mock_ledger_assets, mock_ledger_private,
+ledger_transactions and audit_events. The global DTO omits exact invoice values; private
+values are stored separately to validate internal payment operations. This is application
+separation within the same PostgreSQL database, not cryptographic or consortium isolation.
+
+The caller owns the unit of work. MockLedgerClient flushes but never commits. LedgerService
+commits ledger changes, the receivable projection and audit event together before returning
+a receipt. Database/ledger failure rolls back and never reports success. A lost commit
+acknowledgement can still mean the transaction committed; retry registration with the same
+receivable ID to reconcile it. Stable asset IDs and immutable registration inputs make that
+retry idempotent even after the asset advances.
+
+Registration acquires transaction-scoped advisory locks on asset ID and fingerprint, backed
+by unique constraints. Lifecycle changes use SELECT FOR UPDATE. Internal payment IDs are
+serialized and unique to reject replay. History is ordered by asset revision. Production
+chaincode must independently enforce these same rules in its later milestone.
+
+Audits include generated request IDs (also returned as X-Request-ID), actors, action,
+receivable/asset references and allowlisted metadata. Invoice upload, lifecycle changes,
+registry checks and duplicate rejections are recorded. Successful changes share their
+transaction with their audit; rejected duplicates are recorded after rollback. Existing
+pre-Milestone-3 records are not backfilled with invented history. Authentication/security
+hardening remains future work. Application routes do not expose audit updates or deletes;
+a database administrator can still alter the mock tables.
