@@ -1,11 +1,11 @@
 # TradeCred
 
 Receivable trust infrastructure for MSME trade finance, targeting NPCI Drunix.
-[The PRD](tradecred_prd_codex.md) is the source of truth. **Milestones 0–4 are implemented.**
+[The PRD](tradecred_prd_codex.md) is the source of truth. **Milestones 0–5 are implemented.**
 
 Fragmented institutional records create duplicate-financing and reconciliation risk.
 The planned solution combines deterministic fingerprints, a shared registry, financing
-locks, agreement hashes and authenticated settlement records. Financing and settlement workflows are not implemented yet. Exporters can now create
+locks, agreement hashes and authenticated settlement records. Financing uses explicit mock ledger and payment adapters. Signed settlement is not implemented yet. Exporters can now create
 drafts by uploading PDFs with deterministic invoice fingerprints and integrity hashes, then submit,
 verify (as admin), register, and open them for financing in the explicit mock ledger.
 
@@ -25,7 +25,7 @@ MockLedgerClient, lifecycle transitions, idempotent registration, registry looku
 tests, linting, CI, and Docker Compose.
 The frontend supports sign-in, exporter dashboard, upload, receivable detail, registry results,
 PDF integrity/download, and lifecycle actions. Administrators have a verification workspace.
-Financing and settlement workflows remain future milestones.
+Financing offers, acceptance and sandbox disbursement are implemented. Signed settlement remains a future milestone.
 
 ## Setup
 
@@ -72,6 +72,7 @@ Drunix and bank settings remain reserved in `.env.example`.
 | --- | --- | --- |
 | exporter@tradecred.demo | EXPORTER | ORG_EXPORTER_ALPHA |
 | bank@tradecred.demo | FINANCIER | ORG_BANK_CITI_DEMO |
+| nbfc@tradecred.demo | FINANCIER | ORG_BANK_NBFC_DEMO |
 | settlement@tradecred.demo | SETTLEMENT_OPERATOR | ORG_SETTLEMENT_BANK |
 | admin@tradecred.demo | ADMIN | ORG_CONSORTIUM_ADMIN |
 
@@ -131,7 +132,7 @@ TReDS, guarantee prevention of off-network fraud, move FX, issue e-BRC certifica
 make token state a legal assignment. Read [regulatory boundaries](docs/regulatory-boundaries.md).
 
 [Architecture](docs/architecture.md) · [Threat model](docs/threat-model.md) ·
-[Milestone 0 report](docs/milestone-0.md) · [Milestone 1 report](docs/milestone-1.md) · [Milestone 2 report](docs/milestone-2.md) · [Milestone 3 report](docs/milestone-3.md) · [Milestone 4 report](docs/milestone-4.md)
+[Milestone 0 report](docs/milestone-0.md) · [Milestone 1 report](docs/milestone-1.md) · [Milestone 2 report](docs/milestone-2.md) · [Milestone 3 report](docs/milestone-3.md) · [Milestone 4 report](docs/milestone-4.md) · [Milestone 5 report](docs/milestone-5.md)
 
 ## Uploading and verifying invoices (Milestone 2)
 
@@ -192,8 +193,8 @@ PostgreSQL transaction. Concurrent fingerprint registration and asset locks are 
 Registration retries return the original receipt without rewinding the current status.
 The mock survives restarts but provides neither distributed consensus nor tamper-proof
 history. Its private table is separate from sanitized projections, not a Fabric private
-collection. Internal ledger lock/payment methods enforce invariants; financing APIs and
-signed settlement ingestion remain in their scheduled milestones.
+collection. Financing APIs now use the internal lock operation. Signed settlement ingestion remains
+in its scheduled milestone.
 
 ## Using the receivables UI (Milestone 4)
 
@@ -247,3 +248,34 @@ registry result, timeline, duplicate rejection, session expiry and mobile overfl
 The runner refuses occupied test ports and removes only its generated schema/storage.
 Screenshots are written under ignored `apps/web/test-results/`. CI installs Chromium and
 runs the same suite. No developer invoice records or files are touched.
+
+## Financing (Milestone 5)
+
+Run `make dev` and `make seed` to apply migration 0004 and add the second demo financier
+(`nbfc@tradecred.demo`) without resetting existing credentials. Both financiers use the
+password configured when their accounts were first seeded.
+
+1. As exporter, create, submit, obtain administrator verification, register and open a receivable.
+2. Sign in as `bank@tradecred.demo`. The financier workspace shows sanitized open assets,
+   value ranges and due dates. Open an asset and submit an advance, basis-point rate, tenor
+   and future expiry. Amounts are decimal strings in the **invoice currency**; no FX conversion
+   or automatic fee calculation occurs. Advances cannot exceed face value.
+3. Optionally sign in as `nbfc@tradecred.demo` and submit a competing offer.
+4. As exporter, review the offers and confirm one acceptance. The receivable becomes LOCKED;
+   other live offers are rejected and the canonical TC-AGR-1 agreement hash is recorded.
+5. As the winning institution, use **Assigned to us**, then **Simulate disbursement**.
+   The UI labels this **NPCI Payment Adapter — Sandbox Simulation**. A persisted MOCKPAY-
+   receipt and mock FINANCED transition are committed together. No funds move.
+6. The losing institution cannot disburse or create another offer. The registry reports
+   FINANCED and ineligible. Retrying acceptance or payout returns its existing receipt.
+
+Offers are accepted only for registered FINANCE_AVAILABLE assets, a stricter subset of
+verified receivables. Offers and canonical agreements are private to the owning exporter
+and relevant institution; admins see sanitized asset state and audit metadata, not terms.
+Financiers retain sanitized access to assets they previously offered on. Expired offers
+are shown as expired immediately and cannot be accepted; expiration is persisted during
+subsequent financing mutations. No expiry worker is required.
+
+Run `make test`, `make test-integration`, `make lint`, and `make test-e2e`. The browser suite
+now includes competing institutions, acceptance review, agreement display, winning-lender
+payout, duplicate financing rejection and mobile layout. All test data remains isolated.

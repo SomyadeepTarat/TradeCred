@@ -37,10 +37,11 @@ export type Receivable = {
   exporter_org_id: string;
   invoice_number: string | null;
   buyer_id: string | null;
-  invoice_date: string;
+  invoice_date: string | null;
   due_date: string;
   currency: string;
   face_value: string | null;
+  face_value_bucket: string;
   status: string;
   invoice_fingerprint: string | null;
   document_hash: string | null;
@@ -106,7 +107,9 @@ export const date = (value: string) =>
     year: "numeric",
   });
 // Keep exact server decimal strings; never round 64-bit minor units through JS Number.
-export function money(row: Receivable): string {
+export function money(
+  row: Pick<Receivable, "face_value" | "currency">,
+): string {
   if (row.face_value === null) return "Private value";
   const [integer, fraction] = row.face_value.split(".");
   return `${row.currency} ${integer.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}${fraction === undefined ? "" : "." + fraction}`;

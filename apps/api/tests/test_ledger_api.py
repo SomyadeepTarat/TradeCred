@@ -84,7 +84,7 @@ def test_registration_registry_history_and_retry(database: Engine, storage_root:
         ]
         assert [e["to_status"] for e in history["ledger"]] == ["REGISTERED", "FINANCE_AVAILABLE"]
         assert history["events"][3]["request_id"] == response.headers["x-request-id"]
-        assert client.get(path + "/history", headers=bank).status_code == 404
+        assert client.get(path + "/history", headers=bank).json()["events"] == []
         assert client.get("/api/v1/audit/events", headers=owner).status_code == 403
         audit = client.get("/api/v1/audit/events", headers=admin).json()
         assert any(e["event_type"] == "DUPLICATE_REJECTED" for e in audit)

@@ -5,7 +5,10 @@ from sqlalchemy import Connection
 
 from app.core.config import Settings
 from app.core.database import create_database_engine
-from app.models import ledger  # noqa: F401
+from app.models import (
+    financing,  # noqa: F401
+    ledger,  # noqa: F401
+)
 from app.models.domain import Base
 
 

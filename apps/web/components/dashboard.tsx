@@ -1,10 +1,11 @@
 "use client";
 import Link from "next/link";
+import { FinancierDashboard } from "./financier-dashboard";
 import { useEffect, useState } from "react";
 import { api, date, label, money, Page } from "../lib/api";
 import { ErrorNotice, Status, useApiError, useUser } from "./workspace";
 
-export function Dashboard() {
+function ExporterDashboard() {
   const user = useUser();
   const [data, setData] = useState<Page | null>(null);
   const [status, setStatus] = useState("");
@@ -272,5 +273,14 @@ export function Dashboard() {
         )}
       </section>
     </>
+  );
+}
+
+export function Dashboard() {
+  const user = useUser();
+  return user.role === "FINANCIER" ? (
+    <FinancierDashboard />
+  ) : (
+    <ExporterDashboard />
   );
 }

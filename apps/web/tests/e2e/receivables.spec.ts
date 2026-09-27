@@ -23,7 +23,9 @@ test("exporter creates, admin verifies, exporter registers and checks history", 
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await login(page, "exporter");
-  await expect(page.getByText("Your register starts here")).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Your receivables" }),
+  ).toBeVisible();
   await page
     .getByRole("main")
     .getByRole("link", { name: "＋ Create receivable" })
@@ -123,7 +125,7 @@ test("expired session returns to login and unsupported role has no exporter cont
   await context.clearCookies();
   await page.reload();
   await expect(page).toHaveURL("/login");
-  await login(page, "bank");
+  await login(page, "settlement");
   await expect(
     page.getByRole("heading", { name: "Your account is connected" }),
   ).toBeVisible();

@@ -9,6 +9,9 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { Login } from "../components/login";
 import { Dashboard } from "../components/dashboard";
 import { CreateReceivable } from "../components/create-receivable";
+vi.mock("../components/financing-panel", () => ({
+  FinancingPanel: () => null,
+}));
 import { ReceivableDetail } from "../components/receivable-detail";
 import { api, ApiError, money, Receivable } from "../lib/api";
 

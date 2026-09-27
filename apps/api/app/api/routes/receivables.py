@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Request, Response
@@ -97,11 +97,12 @@ async def list_receivables(
     user: CurrentUser,
     response: Response,
     status: ReceivableStatus | None = None,
+    view: Literal["all", "available", "assigned", "offers"] = "all",
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
     offset: Annotated[int, Query(ge=0, le=100000)] = 0,
 ) -> ReceivablePage:
     response.headers["Cache-Control"] = "no-store"
-    return await ReceivableQueries(session, settings, user).list(status, limit, offset)
+    return await ReceivableQueries(session, settings, user).list(status, limit, offset, view)
 
 
 @router.get("/{receivable_id}", response_model=ReceivableDetail)

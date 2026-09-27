@@ -71,7 +71,9 @@ export function Workspace({ children }: { children: React.ReactNode }) {
             <span>
               {user?.role === "ADMIN"
                 ? "Verification workspace"
-                : "Receivables"}
+                : user?.role === "FINANCIER"
+                  ? "Financier workspace"
+                  : "Receivables"}
             </span>
           </Link>
           {user?.role === "EXPORTER" && (
@@ -84,7 +86,7 @@ export function Workspace({ children }: { children: React.ReactNode }) {
           )}
         </nav>
         <div className="sidebar-bottom">
-          <span className="small-tag">PROTOTYPE · MILESTONE 4</span>
+          <span className="small-tag">PROTOTYPE · MILESTONE 5</span>
           <p>
             Drunix is the target platform.
             <br />

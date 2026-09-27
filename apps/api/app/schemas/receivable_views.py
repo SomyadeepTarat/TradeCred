@@ -14,10 +14,11 @@ class ReceivableView(BaseModel):
     exporter_org_id: str
     invoice_number: str | None
     buyer_id: str | None
-    invoice_date: date
+    invoice_date: date | None
     due_date: date
     currency: str
     face_value: str | None
+    face_value_bucket: str
     status: ReceivableStatus
     invoice_fingerprint: str | None
     document_hash: str | None

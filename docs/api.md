@@ -1,4 +1,4 @@
-# API — Milestone 4
+# API — Milestone 5
 
 Base path: `/api/v1`. Interactive OpenAPI: `http://localhost:8000/docs`.
 
@@ -42,8 +42,8 @@ Codes: `AUTHENTICATION_REQUIRED` (401), `INVALID_TOKEN` (401),
 `INVALID_CREDENTIALS` (401), `UNAUTHORIZED_ROLE` (403). Authentication errors include
 `WWW-Authenticate: Bearer`. Request validation retains FastAPI's 422 format for now.
 
-The mock lifecycle and registry endpoints below are available. Financing and settlement
-APIs remain future milestones; no endpoint reports a live Drunix transaction or payment.
+The mock lifecycle, registry and financing endpoints below are available. Signed settlement
+remains a future milestone; no endpoint reports a live Drunix transaction or payment.
 
 ## Invoice documents
 
@@ -155,3 +155,57 @@ The Next.js `/api/backend/...` gateway exposes only the route allowlist needed b
 Its `auth/login` sets an HttpOnly cookie and returns `{ "signedIn": true }`, not a JWT.
 `auth/logout` deletes that cookie. Requests use same-origin cookies, with Origin/Host
 validation for POSTs. The underlying FastAPI login API continues returning JWTs to API clients.
+
+
+## Financing APIs (Milestone 5)
+
+All paths use `/api/v1`. Private financing responses are no-store.
+
+| Method | Path | Access |
+| --- | --- | --- |
+| POST | `/receivables/{id}/offers` | FINANCIER; registered FINANCE_AVAILABLE asset |
+| GET | `/receivables/{id}/offers` | Owner exporter sees all offers; financier sees its own; admin sees no terms |
+| POST | `/offers/{id}/accept` | Owner EXPORTER only; idempotent for the accepted offer |
+| POST | `/offers/{id}/reject` | Owner EXPORTER only; accepted offers cannot be rejected |
+| POST | `/receivables/{id}/disbursement/mock` | Winning FINANCIER only; idempotent sandbox payout |
+
+Offer body:
+
+```json
+{"advanceAmount":"9750.00","currency":"EUR","discountRateBps":250,"tenorDays":60,"expiresAt":"2099-01-01T12:00:00Z"}
+```
+
+Use a future timezone-aware expiry. The example is illustrative. `advanceAmount` must be
+positive exact decimal text, no greater than face value, in the invoice currency.
+`discountRateBps` is an integer 0–10000; `tenorDays` is an integer 1–3650. Extra fields and
+client-supplied institution IDs are rejected. Rate and tenor are recorded terms; the
+advance is supplied explicitly, with no implicit FX/discount calculation.
+
+GET offers returns `offers`, authorized `agreement`, `payment`, `can_offer`, `can_accept`,
+`can_disburse`, and `backend`. Monetary offer values are decimal strings. The canonical
+agreement is supplied as text to preserve exact integer values in JavaScript. Only its
+hash is committed to sanitized ledger state. The agreement contains version, asset,
+exporter, institution, exact minor-unit advance, currency, rate, tenor, UTC acceptance time,
+terms version and consortium financing-lock representation. Canonical JSON uses sorted
+keys, compact separators, UTF-8, and SHA-256.
+
+Acceptance locks the receivable, marks one offer ACCEPTED, rejects competing live offers,
+persists the agreement and audits atomically. An expired acceptance returns 409 after
+recording expiry. Repeated accepted-offer requests return `replayed: true`, the original
+lock transaction and current asset status, without rewinding state.
+
+Disbursement returns `payment.status: SIMULATED_SUCCEEDED`, `backend: mock`, a MOCKPAY-
+transaction ID and a MOCK- ledger reference. Simulation, ledger transition, projection and
+audit share one transaction. Failure reports no success; retries reconcile a lost response.
+This does not confirm buyer settlement. Drunix mode returns 503 without fallback.
+
+Financier GET `/receivables` supports `view=available|offers|assigned|all`; pagination and
+status filtering remain available. Only open assets, assigned assets or assets with that
+institution's previous offers are visible. Exact value, buyer, invoice number and invoice
+date are null; `face_value_bucket` supplies a range. PDFs remain inaccessible. Financier
+history contains sanitized ledger revisions and an empty application-audit list.
+
+409 errors include OFFER_EXPIRED, OFFER_NOT_AVAILABLE, RECEIVABLE_ALREADY_LOCKED,
+RECEIVABLE_ALREADY_FINANCED, AGREEMENT_INTEGRITY_FAILED and INVALID_STATE_TRANSITION.
+Ledger/projection disagreement returns 503 LEDGER_STATE_MISMATCH. Payment/DB failures
+never return success. Rejected duplicate-financing attempts receive audit records.

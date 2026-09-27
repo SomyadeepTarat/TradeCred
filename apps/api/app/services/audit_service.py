@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -6,6 +7,9 @@ from app.models.ledger import AuditEvent
 
 SAFE_FIELDS = {
     "fingerprint",
+    "offerId",
+    "agreementHash",
+    "paymentId",
     "fromStatus",
     "toStatus",
     "backend",
@@ -37,5 +41,6 @@ def record_audit(
             receivable_id=receivable_id,
             asset_id=asset_id,
             metadata_json=metadata or {},
+            created_at=datetime.now(UTC),
         )
     )

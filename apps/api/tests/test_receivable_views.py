@@ -58,10 +58,13 @@ def test_scoped_list_detail_summary_and_pagination(database, storage_root, pdf_b
         assert client.get("/api/v1/receivables", headers=beta).json()["recent_activity"] == []
         assert client.get(f"/api/v1/receivables/{uuid4()}", headers=owner).status_code == 404
         assert client.get("/api/v1/receivables").status_code == 401
-        for email in ("bank@tradecred.demo", "settlement@tradecred.demo"):
+        for email in ("settlement@tradecred.demo",):
             headers = login(client, email)
             assert client.get("/api/v1/receivables", headers=headers).status_code == 403
             assert client.get(path, headers=headers).status_code == 403
+        bank = login(client, "bank@tradecred.demo")
+        assert client.get("/api/v1/receivables", headers=bank).status_code == 200
+        assert client.get(path, headers=bank).status_code == 404
 
 
 def test_admin_sanitization_and_role_specific_actions(database, storage_root, pdf_bytes):

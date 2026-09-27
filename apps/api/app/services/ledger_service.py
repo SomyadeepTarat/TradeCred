@@ -17,6 +17,7 @@ from app.models.ledger import AuditEvent
 from app.schemas.ledger import AuditResponse, HistoryResponse, LifecycleResponse, RegistryResponse
 from app.services.audit_service import record_audit
 from app.services.fingerprint_service import canonical_invoice, document_hash, invoice_fingerprint
+from app.services.receivable_access import financier_scope
 from app.services.state_machine import require_transition
 
 
@@ -237,6 +238,18 @@ class LedgerService:
 
     async def history(self, receivable_id: UUID) -> HistoryResponse:
         try:
+            if self.actor.role == Role.FINANCIER:
+                row = await self.session.scalar(
+                    select(Receivable).where(
+                        Receivable.id == receivable_id, financier_scope(self.actor.organization_id)
+                    )
+                )
+                if row is None:
+                    raise APIError(404, "RECEIVABLE_NOT_FOUND", "Receivable not found.")
+                ledger = create_ledger_client(self.session, self.settings, self.actor)
+                return HistoryResponse(
+                    events=[], ledger=await ledger.get_history(row.asset_id or "")
+                )
             row = await self._load(receivable_id)
             events = await self.session.scalars(
                 select(AuditEvent)

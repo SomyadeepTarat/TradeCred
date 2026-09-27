@@ -1,4 +1,5 @@
 from decimal import Decimal
+from typing import Literal
 from uuid import UUID
 
 from iso4217 import Currency
@@ -7,8 +8,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings
 from app.core.errors import APIError
+from app.integrations.ledger.mock import value_bucket
 from app.models.domain import Document, Receivable, Role, User
 from app.models.domain import ReceivableStatus as S
+from app.models.financing import FinancingOffer
 from app.models.ledger import AuditEvent
 from app.schemas.ledger import AuditResponse
 from app.schemas.receivable_views import (
@@ -17,6 +20,7 @@ from app.schemas.receivable_views import (
     ReceivablePage,
     ReceivableView,
 )
+from app.services.receivable_access import financier_scope
 from app.services.state_machine import TRANSITIONS
 
 
@@ -27,6 +31,8 @@ class ReceivableQueries:
     def _scope(self) -> ColumnElement[bool]:
         if self.user.role == Role.ADMIN:
             return Receivable.id.is_not(None)
+        if self.user.role == Role.FINANCIER:
+            return financier_scope(self.user.organization_id)
         if self.user.role == Role.EXPORTER:
             return Receivable.exporter_org_id == self.user.organization_id
         raise APIError(
@@ -46,10 +52,11 @@ class ReceivableQueries:
             exporter_org_id=row.exporter_org_id,
             invoice_number=row.invoice_number if private else None,
             buyer_id=row.buyer_id if private else None,
-            invoice_date=row.invoice_date,
+            invoice_date=row.invoice_date if self.user.role != Role.FINANCIER else None,
             due_date=row.due_date,
             currency=row.currency,
             face_value=amount if private else None,
+            face_value_bucket=value_bucket(row.face_value_minor, row.currency),
             status=row.status,
             invoice_fingerprint=row.invoice_fingerprint,
             document_hash=row.document_hash,
@@ -60,8 +67,25 @@ class ReceivableQueries:
             updated_at=row.updated_at,
         )
 
-    async def list(self, status: S | None, limit: int, offset: int) -> ReceivablePage:
+    async def list(
+        self,
+        status: S | None,
+        limit: int,
+        offset: int,
+        view: Literal["all", "available", "assigned", "offers"] = "all",
+    ) -> ReceivablePage:
         scope = self._scope()
+        if self.user.role == Role.FINANCIER:
+            if view == "available":
+                scope = scope & (Receivable.status == S.FINANCE_AVAILABLE)
+            elif view == "assigned":
+                scope = scope & (Receivable.owner_org_id == self.user.organization_id)
+            elif view == "offers":
+                scope = scope & Receivable.id.in_(
+                    select(FinancingOffer.receivable_id).where(
+                        FinancingOffer.financier_org_id == self.user.organization_id
+                    )
+                )
         grouped = (
             await self.session.execute(
                 select(Receivable.status, func.count()).where(scope).group_by(Receivable.status)
@@ -94,7 +118,9 @@ class ReceivableQueries:
                 financed=sum(counts.get(s, 0) for s in {S.FINANCED, S.OVERDUE, S.DISPUTED}),
                 settled=sum(counts.get(s, 0) for s in settled),
             ),
-            recent_activity=[AuditResponse.model_validate(event) for event in events],
+            recent_activity=[]
+            if self.user.role == Role.FINANCIER
+            else [AuditResponse.model_validate(event) for event in events],
         )
 
     async def detail(self, receivable_id: UUID) -> ReceivableDetail:

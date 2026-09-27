@@ -38,3 +38,18 @@ Cookies become Secure for HTTPS requests. Local development binds to loopback; p
 TLS/proxy policy, CSP hardening, rate limiting and session revocation remain future work.
 Role/organization checks happen at FastAPI on every request. Client-visible action hints
 are not authorization. UI reads omit private fields for admins and reject non-owner exporters.
+
+
+## Financing controls (Milestone 5)
+
+Receivable row locks serialize competing acceptances and payouts. Database constraints
+backstop single acceptance/agreement/disbursement. Only the exporter can accept; only the
+winning institution can simulate payout. Registry state is checked before financial mutations;
+failed ledger or payment operations roll back together. Agreement payload hashes and
+recorded terms are revalidated before payout. Replays return existing receipts.
+
+Offer terms are filtered by institution; only the owner exporter can compare all offers.
+Financier history omits private application audit records, and raw PDF access stays exporter-only.
+Duplicate financing attempts on visible locked/financed assets are audited after rollback.
+These are local simulation guarantees, not real payment finality, legal assignment or
+prevention of off-network fraud. Signed buyer-settlement events remain Milestone 6.

@@ -4,10 +4,10 @@ const COOKIE = "tradecred_session";
 const MAX_BODY = 50 * 1024 * 1024 + 65536;
 const UUID = "[0-9a-fA-F-]{36}";
 const allowedGet = new RegExp(
-  `^(auth/me|receivables|receivables/${UUID}(/history|/document|/document/integrity)?|registry/fingerprint/[a-f0-9]{64})$`,
+  `^(auth/me|receivables|receivables/${UUID}(/history|/document|/document/integrity|/offers)?|registry/fingerprint/[a-f0-9]{64})$`,
 );
 const allowedPost = new RegExp(
-  `^(auth/login|auth/logout|receivables|receivables/${UUID}/(submit|verify|register|open-financing))$`,
+  `^(auth/login|auth/logout|receivables|receivables/${UUID}/(submit|verify|register|open-financing|offers|disbursement/mock)|offers/${UUID}/(accept|reject))$`,
 );
 
 function error(status: number, message: string) {

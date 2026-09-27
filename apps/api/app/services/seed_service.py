@@ -16,6 +16,7 @@ DEMO_ORGANIZATIONS = (
 DEMO_USERS = (
     ("exporter@tradecred.demo", "Demo Exporter", Role.EXPORTER, "ORG_EXPORTER_ALPHA"),
     ("bank@tradecred.demo", "Demo Financier", Role.FINANCIER, "ORG_BANK_CITI_DEMO"),
+    ("nbfc@tradecred.demo", "Demo Second Financier", Role.FINANCIER, "ORG_BANK_NBFC_DEMO"),
     (
         "settlement@tradecred.demo",
         "Demo Settlement Operator",

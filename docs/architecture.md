@@ -1,6 +1,6 @@
 # Architecture and implementation status
 
-Milestones 0–4 provide Next.js, FastAPI and PostgreSQL 16. The frontend provides an
+Milestones 0–5 provide Next.js, FastAPI and PostgreSQL 16. The frontend provides an
 exporter workspace and a sanitized administrator verification view.
 
 FastAPI creates an async SQLAlchemy engine during lifespan and disposes it on shutdown.
@@ -88,3 +88,21 @@ The interface fetches persisted data, refreshes after successful actions, and re
 loading, empty, unauthorized and unavailable states explicitly. History entries come from
 audit records/ledger revisions, not inferred completion of a preset timeline. Browser
 acceptance tests run against real temporary API, PostgreSQL and production Next.js servers.
+
+
+Milestone 5 introduces financing_offers, financing_agreements and mock_disbursements via
+migration 0004. FinancingService always locks the receivable before reading/mutating
+its offers, serializing acceptance, rejection, offer creation and disbursement. A partial
+unique index independently permits only one ACCEPTED offer per receivable. Agreements
+and mock payouts are unique per receivable/agreement. LedgerClient remains authoritative
+for lock/state transitions; registry state is compared with the application projection.
+
+Acceptance hashes sorted compact UTF-8 TC-AGR-1 JSON and stores the private payload off
+ledger. Before payout, payload, hash, offer terms, owner and ledger projection are checked.
+The PaymentAdapter protocol is implemented by MockNPCIPaymentAdapter, which persists a
+simulation receipt without external requests. It shares the transaction with MockLedgerClient;
+external payment integrations would require a separate reconciliation design in a future scope.
+
+The frontend adds a sanitized financier register and private offers panel to existing
+detail views. It shows acceptance terms before confirmation and labels every payout as
+sandbox simulation. The gateway allowlist includes only the added financing routes.

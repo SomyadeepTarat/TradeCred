@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { FinancingPanel } from "./financing-panel";
 import { useEffect, useState } from "react";
 import { api, date, Detail, History, label, money, Registry } from "../lib/api";
 import { ErrorNotice, Status, useApiError, useUser } from "./workspace";
@@ -18,8 +19,12 @@ const guidance: Record<string, string> = {
     "Verification is recorded. You can now register this receivable on the selected ledger.",
   REGISTERED:
     "Registration is recorded. Open the receivable for future financing workflows when ready.",
+  LOCKED:
+    "An offer is accepted and this receivable is locked. The assigned institution can record a simulated disbursement.",
+  FINANCED:
+    "Financing is recorded with an explicit sandbox payout. Signed settlement is not available yet.",
   FINANCE_AVAILABLE:
-    "This receivable is open for financing. Offer and disbursement workflows arrive in a later milestone.",
+    "This receivable is open for financing. Institutions can submit offers; the exporter can accept one.",
 };
 export function ReceivableDetail({ id }: { id: string }) {
   const user = useUser();
@@ -200,8 +205,14 @@ export function ReceivableDetail({ id }: { id: string }) {
               <h2>Invoice overview</h2>
               <dl className="facts">
                 <div>
-                  <dt>Face value</dt>
-                  <dd className="value-large">{money(row)}</dd>
+                  <dt>
+                    {user.role === "FINANCIER" ? "Value range" : "Face value"}
+                  </dt>
+                  <dd className="value-large">
+                    {user.role === "FINANCIER"
+                      ? `${row.currency} ${row.face_value_bucket}`
+                      : money(row)}
+                  </dd>
                 </div>
                 <div>
                   <dt>Buyer ID</dt>
@@ -209,7 +220,11 @@ export function ReceivableDetail({ id }: { id: string }) {
                 </div>
                 <div>
                   <dt>Invoice date</dt>
-                  <dd>{date(row.invoice_date)}</dd>
+                  <dd>
+                    {row.invoice_date
+                      ? date(row.invoice_date)
+                      : "Private to exporter"}
+                  </dd>
                 </div>
                 <div>
                   <dt>Due date</dt>
@@ -307,6 +322,7 @@ export function ReceivableDetail({ id }: { id: string }) {
               </div>
             </div>
           </section>
+          <FinancingPanel row={row} onChanged={reload} />
           <div className="detail-grid">
             <section className="panel">
               <h2>Lifecycle history</h2>
@@ -366,10 +382,10 @@ export function ReceivableDetail({ id }: { id: string }) {
                 )}
               </section>
               <section className="panel">
-                <h2>Financing & settlement</h2>
+                <h2>Settlement status</h2>
                 <p>
-                  No financing offers or settlement actions are available in
-                  this milestone.
+                  Signed settlement actions are not available yet. Financing
+                  details are shown above.
                 </p>
                 <p className="muted">
                   {row.ebrc_status

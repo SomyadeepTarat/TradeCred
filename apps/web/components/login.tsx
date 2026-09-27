@@ -84,7 +84,7 @@ export function Login() {
         </form>
         <div className="demo-identities">
           <p className="eyebrow">DEMO IDENTITIES</p>
-          {["exporter", "admin", "bank", "settlement"].map((role) => (
+          {["exporter", "admin", "bank", "nbfc", "settlement"].map((role) => (
             <button
               key={role}
               type="button"
