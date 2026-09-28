@@ -1,0 +1,35 @@
+{
+  "DRAFT": [
+    "SUBMITTED"
+  ],
+  "SUBMITTED": [
+    "VERIFIED"
+  ],
+  "VERIFIED": [
+    "REGISTERED"
+  ],
+  "REGISTERED": [
+    "FINANCE_AVAILABLE"
+  ],
+  "FINANCE_AVAILABLE": [
+    "LOCKED"
+  ],
+  "LOCKED": [
+    "FINANCED",
+    "RELEASED"
+  ],
+  "FINANCED": [
+    "DISPUTED",
+    "OVERDUE",
+    "PAYMENT_CONFIRMED"
+  ],
+  "PAYMENT_CONFIRMED": [
+    "REALIZED"
+  ],
+  "REALIZED": [
+    "EBRC_ELIGIBLE"
+  ],
+  "EBRC_ELIGIBLE": [
+    "CLOSED"
+  ]
+}

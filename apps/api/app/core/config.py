@@ -1,10 +1,16 @@
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, PostgresDsn, SecretStr, field_validator
+from pydantic import BaseModel, Field, PostgresDsn, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ROOT_ENV = (Path(__file__).resolve().parent / "../../../../.env").resolve()
+
+
+class TrustedBankKey(BaseModel):
+    bank_id: str
+    organization_id: str
+    public_key_path: Path
 
 
 class Settings(BaseSettings):
@@ -13,6 +19,9 @@ class Settings(BaseSettings):
     database_url: PostgresDsn = PostgresDsn(
         "postgresql+psycopg://tradecred:tradecred_local@localhost:5432/tradecred"
     )
+    bank_trusted_keys: dict[str, TrustedBankKey] = Field(default_factory=dict)
+    payment_timestamp_tolerance_seconds: int = Field(default=300, ge=1, le=300)
+
     ledger_backend: Literal["mock", "drunix"] = "mock"
 
     jwt_secret: SecretStr = Field(min_length=32)

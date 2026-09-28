@@ -5,7 +5,7 @@ Receivable trust infrastructure for MSME trade finance, targeting NPCI Drunix.
 
 Fragmented institutional records create duplicate-financing and reconciliation risk.
 The planned solution combines deterministic fingerprints, a shared registry, financing
-locks, agreement hashes and authenticated settlement records. Financing uses explicit mock ledger and payment adapters. Signed settlement is not implemented yet. Exporters can now create
+locks, agreement hashes and authenticated settlement records. Financing uses explicit mock ledger and payment adapters. Signed bank settlement events are verified with Ed25519. Exporters can now create
 drafts by uploading PDFs with deterministic invoice fingerprints and integrity hashes, then submit,
 verify (as admin), register, and open them for financing in the explicit mock ledger.
 
@@ -25,7 +25,7 @@ MockLedgerClient, lifecycle transitions, idempotent registration, registry looku
 tests, linting, CI, and Docker Compose.
 The frontend supports sign-in, exporter dashboard, upload, receivable detail, registry results,
 PDF integrity/download, and lifecycle actions. Administrators have a verification workspace.
-Financing offers, acceptance and sandbox disbursement are implemented. Signed settlement remains a future milestone.
+Financing offers, acceptance and sandbox disbursement are implemented. Authenticated settlement advances financed assets to PAYMENT_CONFIRMED.
 
 ## Setup
 
@@ -116,13 +116,13 @@ localhost. Both API and web containers run without root. Health endpoints:
   PDF before submission, verification and registration. Legacy drafts without PDFs cannot advance.
 - `LEDGER_BACKEND=mock` uses PostgreSQL-backed MockLedgerClient. Responses identify
   `backend: mock` and transaction IDs start with `MOCK-`. This is a simulation.
-- `LEDGER_BACKEND=drunix` reserves the future gateway configuration. Chaincode is
-  Milestone 7 and the gateway is Milestone 8. Ledger-dependent calls return 503 now;
+- `LEDGER_BACKEND=drunix` reserves the future gateway configuration. Go chaincode is implemented in
+  Milestone 7; the gateway remains Milestone 8. Ledger-dependent calls return 503 now;
   there is no silent fallback.
-- `make demo`, `make reset`, and `make test-chaincode` deliberately exit nonzero until
-  their real implementations arrive. No payments or settlements exist yet.
+- `make demo` and `make reset` deliberately exit nonzero until
+  their real implementations arrive. Payments remain explicit simulations; settlement consumes signed bank events.
 - Authentication has no registration, password-reset, refresh-token, or logout-revocation
-  flow. Login rate limiting and security audit logging remain hardening work. Keep the
+  flow. Login rate limiting and broader security audit logging remain hardening work. Keep the
   development stack private. Deactivated users lose access immediately.
 - Next.js's current lint plugins require ESLint 9, which emits an upstream support warning;
   ESLint 10 is incompatible with their current React rules. The locked npm audit is clean.
@@ -132,7 +132,7 @@ TReDS, guarantee prevention of off-network fraud, move FX, issue e-BRC certifica
 make token state a legal assignment. Read [regulatory boundaries](docs/regulatory-boundaries.md).
 
 [Architecture](docs/architecture.md) · [Threat model](docs/threat-model.md) ·
-[Milestone 0 report](docs/milestone-0.md) · [Milestone 1 report](docs/milestone-1.md) · [Milestone 2 report](docs/milestone-2.md) · [Milestone 3 report](docs/milestone-3.md) · [Milestone 4 report](docs/milestone-4.md) · [Milestone 5 report](docs/milestone-5.md)
+[Milestone 0 report](docs/milestone-0.md) · [Milestone 1 report](docs/milestone-1.md) · [Milestone 2 report](docs/milestone-2.md) · [Milestone 3 report](docs/milestone-3.md) · [Milestone 4 report](docs/milestone-4.md) · [Milestone 5 report](docs/milestone-5.md) · [Milestone 6 report](docs/milestone-6.md) · [Milestone 7 report](docs/milestone-7.md)
 
 ## Uploading and verifying invoices (Milestone 2)
 
@@ -193,8 +193,7 @@ PostgreSQL transaction. Concurrent fingerprint registration and asset locks are 
 Registration retries return the original receipt without rewinding the current status.
 The mock survives restarts but provides neither distributed consensus nor tamper-proof
 history. Its private table is separate from sanitized projections, not a Fabric private
-collection. Financing APIs now use the internal lock operation. Signed settlement ingestion remains
-in its scheduled milestone.
+collection. Financing APIs now use the internal lock operation. Signed settlement ingestion is implemented in Milestone 6.
 
 ## Using the receivables UI (Milestone 4)
 
@@ -279,3 +278,42 @@ subsequent financing mutations. No expiry worker is required.
 Run `make test`, `make test-integration`, `make lint`, and `make test-e2e`. The browser suite
 now includes competing institutions, acceptance review, agreement display, winning-lender
 payout, duplicate financing rejection and mobile layout. All test data remains isolated.
+
+
+## Settlement security (Milestone 6)
+
+Run `make keys` once, then `make dev` and `make seed`. The bank simulator signs events
+with a local Ed25519 private key; Docker mounts only the public key in the API.
+For a financed EUR 10,800 invoice, replace TC-REPLACE with its asset ID:
+
+```sh
+make bank-event ARGS="--asset-id TC-REPLACE --amount-minor 1080000 --currency EUR --reference IRM-DEMO-938291 --invalid-signature"
+make bank-event ARGS="--asset-id TC-REPLACE --amount-minor 1080000 --currency EUR --reference IRM-DEMO-938291 --save data/payment-event.json"
+make bank-event ARGS="--replay data/payment-event.json"
+```
+
+Expected: invalid signature rejected, valid event confirms payment, replay rejected.
+Refresh the asset to view PAYMENT_CONFIRMED and recorded ledger history. No funds move.
+The full invoice amount is required, not the advance amount; no FX conversion is assumed.
+See [simulator setup and protocol](services/bank-simulator/README.md) for host API
+configuration, key custody and retry semantics. Browser simulator and downstream
+realization/e-BRC/closure orchestration remain later work.
+
+
+## Go chaincode (Milestone 7)
+
+```sh
+make test-chaincode       # Race detection and coverage
+make lint-chaincode       # gofmt and go vet
+make build-chaincode      # Ignored build/tradecred executable
+```
+
+These also run through make test / make lint and CI. Use Go 1.26+ or running Docker Desktop;
+without local Go, the runner uses a pinned Go container and persistent dependency caches.
+The first run needs network access to download the toolchain and dependencies.
+
+TradeCredContract enforces registration, duplicate blocking, lifecycle transitions,
+financing ownership, private commercial data and payment event uniqueness. See the
+[contract guide](blockchain/chaincode/tradecred/README.md) for functions, transient payloads,
+MSP attributes, collection policies and deployment prerequisites. Contract tests pass locally;
+no Drunix network is deployed, and the application continues to use explicit mock ledger mode.

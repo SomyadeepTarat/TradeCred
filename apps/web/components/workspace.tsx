@@ -86,7 +86,7 @@ export function Workspace({ children }: { children: React.ReactNode }) {
           )}
         </nav>
         <div className="sidebar-bottom">
-          <span className="small-tag">PROTOTYPE · MILESTONE 5</span>
+          <span className="small-tag">PROTOTYPE · MILESTONE 6</span>
           <p>
             Drunix is the target platform.
             <br />

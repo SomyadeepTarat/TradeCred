@@ -24,8 +24,14 @@ services:
       DOCUMENT_STORAGE_PATH: /data/documents
       MAX_UPLOAD_BYTES: ${MAX_UPLOAD_BYTES:-10485760}
       LEDGER_BACKEND: ${LEDGER_BACKEND:-mock}
+      BANK_TRUSTED_KEYS: '{"demo-bank-1":{"bank_id":"BANK_SETTLEMENT_01","organization_id":"ORG_SETTLEMENT_BANK","public_key_path":"/bank-public/bank-public.pem"}}'
+      PAYMENT_TIMESTAMP_TOLERANCE_SECONDS: ${PAYMENT_TIMESTAMP_TOLERANCE_SECONDS:-300}
     volumes:
       - document_data:/data/documents
+      - type: bind
+        source: ./data/bank-public
+        target: /bank-public
+        read_only: true
     command: ["sh", "-c", ".venv/bin/alembic upgrade head && exec .venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000"]
     ports:
       - "127.0.0.1:8000:8000"

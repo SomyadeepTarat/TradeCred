@@ -1,6 +1,6 @@
 # Threat model
 
-Milestones 0–4 provide authentication, document integrity, mock ledger state enforcement
+Milestones 0–6 provide authentication, document integrity, mock ledger state enforcement
 and the receivables UI. The controls below distinguish implemented behavior from future protections.
 
 | Threat | Required mitigation and implementation milestone |
@@ -15,7 +15,7 @@ and the receivables UI. The controls below distinguish implemented behavior from
 
 Current controls: localhost-only Compose ports, ignored environment files, non-root
 API/web containers, readiness failure without credential disclosure, and real database
-connectivity tests. JWT authentication and admin-only organization access are implemented. Authenticated users are reloaded from PostgreSQL so disabled accounts and removed roles cannot retain access. Login throttling, security audit logging, password recovery and token revocation beyond account deactivation are not implemented yet. Local
+connectivity tests. JWT authentication and admin-only organization access are implemented. Authenticated users are reloaded from PostgreSQL so disabled accounts and removed roles cannot retain access. Login throttling, broader security audit logging, password recovery and token revocation beyond account deactivation are not implemented yet. Local
 sample database credentials are not production credentials. Do not expose this stack
 as a production service. Future logs must exclude tokens, keys, accounts and document bytes.
 
@@ -52,4 +52,42 @@ Offer terms are filtered by institution; only the owner exporter can compare all
 Financier history omits private application audit records, and raw PDF access stays exporter-only.
 Duplicate financing attempts on visible locked/financed assets are audited after rollback.
 These are local simulation guarantees, not real payment finality, legal assignment or
-prevention of off-network fraud. Signed buyer-settlement events remain Milestone 6.
+prevention of off-network fraud. Signed buyer-settlement validation is implemented in Milestone 6.
+
+## Settlement controls (Milestone 6)
+
+Implemented Ed25519 verification over domain-separated exact bytes, explicit trusted
+key/bank/organization mapping, active identity checks, strict schema, bounded body,
+timestamp freshness, nonce/event uniqueness, full-invoice amount/currency matching and
+FINANCED-only transitions. JWTs cannot substitute for bank signatures. Database locks
+serialize concurrent replays; rejected attempts leave financial state unchanged.
+
+Receipt reads are scoped to exporter, assigned financier, submitting bank or admin and
+omit private payment fields. Rejections record only a digest, request ID, server-selected
+reason/type and timestamp. Missing keys fail closed. API containers mount public keys
+only; ignored simulator private keys use mode 0600.
+
+Residual risks: a compromised trusted signer can falsely attest payment; signatures prove
+source, not actual settlement. Host/database admins remain trusted. No HSM, automatic key
+rotation, webhook rate limiting, external reconciliation, retention policy or production
+TLS is supplied. Key registry changes require API restart. Untrusted traffic can generate
+audit rows; public exposure requires hardening.
+
+## Chaincode controls (Milestone 7)
+
+The contract cross-checks certified role/org attributes with an explicit MSP allowlist;
+ordinary arguments cannot spoof organizations. Verification is admin-only; registration
+and acceptance require the matching exporter. Only the assigned financier can record
+financing/release. Payment confirmation requires the settlement backend attribute and
+independently checks state, exact private amount, currency and global event uniqueness.
+
+Sensitive payloads travel through transient data, never ordinary arguments. Salted private
+amount commitments resist guessing; exporter-private storage and four distinct pair
+collections prevent losing banks from being collection members. Public state/history/events
+stay sanitized. Salts must be generated securely off-chain. Proposal recipients see transient
+plaintext, so a future gateway must restrict endorsers to authorized participants.
+
+Tests verify contract logic and rollback semantics in an explicit in-memory harness. They
+do not validate live endorsement, gossip, MVCC, CA provisioning or Drunix compatibility.
+Those require Milestone 8 integration. A compromised trusted verifier/settlement backend,
+misissued certificate attributes or incorrect network endorsement policies remain risks.

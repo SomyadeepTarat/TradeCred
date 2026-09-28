@@ -1,4 +1,4 @@
-# API — Milestone 5
+# API — Milestone 6
 
 Base path: `/api/v1`. Interactive OpenAPI: `http://localhost:8000/docs`.
 
@@ -42,8 +42,7 @@ Codes: `AUTHENTICATION_REQUIRED` (401), `INVALID_TOKEN` (401),
 `INVALID_CREDENTIALS` (401), `UNAUTHORIZED_ROLE` (403). Authentication errors include
 `WWW-Authenticate: Bearer`. Request validation retains FastAPI's 422 format for now.
 
-The mock lifecycle, registry and financing endpoints below are available. Signed settlement
-remains a future milestone; no endpoint reports a live Drunix transaction or payment.
+The mock lifecycle, registry, financing and signed settlement endpoints below are available; no endpoint reports a live Drunix transaction or payment.
 
 ## Invoice documents
 
@@ -126,8 +125,7 @@ allowlisted metadata, timestamp) and `ledger` (mock transaction ID, asset, revis
 from/to status, actor org, timestamp, backend). Ledger revisions begin at registration;
 local creation/submission/verification appear in audit events. No invented history is
 created for older records. Audit log and mock history are PostgreSQL records, not a claim
-of blockchain immutability. Locking/financing and signed settlement endpoints are not
-exposed in this milestone.
+of blockchain immutability. Financing and signed settlement endpoints are documented below.
 
 
 ## Receivables UI read APIs
@@ -135,7 +133,7 @@ exposed in this milestone.
 `GET /receivables?status=SUBMITTED&limit=20&offset=0` and `GET /receivables/{id}` require
 EXPORTER or ADMIN. Exporters can only read their own organization. Admins can review all
 records, but `buyer_id`, `invoice_number` and `face_value` are null; PDFs remain inaccessible.
-Financier/settlement roles receive 403. Other-organization and unknown exporter IDs both
+Financiers receive scoped sanitized access as described below; settlement roles receive 403. Other-organization and unknown exporter IDs both
 return 404. Responses set `Cache-Control: no-store`.
 
 List returns `items`, filtered `total`, organization-scoped `summary` and up to five recent
@@ -209,3 +207,40 @@ history contains sanitized ledger revisions and an empty application-audit list.
 RECEIVABLE_ALREADY_FINANCED, AGREEMENT_INTEGRITY_FAILED and INVALID_STATE_TRANSITION.
 Ledger/projection disagreement returns 503 LEDGER_STATE_MISMATCH. Payment/DB failures
 never return success. Rejected duplicate-financing attempts receive audit records.
+
+## Signed settlement (Milestone 6)
+
+POST /api/v1/settlement/events authenticates with Ed25519, independently of JWTs.
+Send X-TradeCred-Key-Id and X-TradeCred-Signature (standard base64). Sign the protocol
+prefix `TradeCred-settlement-v1\n` followed by the exact HTTP body bytes. The API does
+not canonicalize or reserialize before verification.
+
+JSON fields: eventId, assetId, bankId, bankReference, amountMinor, currency, timestamp,
+nonce (PRD section 18). amountMinor is a positive 64-bit integer equal to the FULL invoice
+value; currency is the exact uppercase invoice currency. No partial payment, advance
+repayment or FX conversion is inferred. timestamp must be timezone-aware and within
+±300 seconds (configurable downwards). nonce is 16–160 ASCII letters/digits/underscore/
+hyphen. IDs and references are bounded. Duplicate JSON fields, unknown fields, malformed
+bodies and bodies over 8192 bytes fail.
+
+200 response: event_id, asset_id, verification_status=VERIFIED, status=PAYMENT_CONFIRMED,
+transaction_id, received_at, backend=mock. The receipt describes the recorded transition,
+not future asset state. Receipt, private remittance reference, receivable projection,
+ledger transition and success audit commit atomically. No realization/e-BRC is implied.
+
+Errors: INVALID_PAYMENT_SIGNATURE (401), UNTRUSTED_BANK (403), INVALID_PAYMENT_EVENT
+(422; 413 for size), PAYMENT_TIMESTAMP_EXPIRED / PAYMENT_EVENT_REPLAY /
+PAYMENT_AMOUNT_MISMATCH / PAYMENT_CURRENCY_MISMATCH / INVALID_STATE_TRANSITION (409),
+ASSET_NOT_FOUND (404), LEDGER_UNAVAILABLE / SETTLEMENT_UNAVAILABLE (503).
+Rejected attempts create security_events with request ID, reason and payload hash only.
+No raw body, signature, key, reference or untrusted claimed identity is stored in this audit.
+Invalid events do not consume identifiers or mutate ledger state. Committed replays fail;
+query the receipt after an uncertain response before retrying.
+
+GET /api/v1/settlement/events/{event_id} requires JWT. Only the exporter, assigned
+financier, submitting settlement organization and admin can read its sanitized receipt.
+Other organizations receive 404. Responses are no-store and omit amounts, nonce and
+remittance reference. The Next.js gateway does not proxy the signed webhook. The bank
+simulator runs outside the browser with its private key.
+
+See [simulator commands](../services/bank-simulator/README.md).

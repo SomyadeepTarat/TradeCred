@@ -18,13 +18,13 @@ The upload service validates ISO-4217 codes and exact currency minor units.
 Compose applies migrations before API startup. Seed runs separately in one transaction
 under a PostgreSQL advisory lock; it preserves existing user credentials and roles.
 Six fictional organizations include the PRD's five participant IDs and a separate
-consortium administration organization. Four users cover all four roles.
+consortium administration organization. Five users cover all four roles, including two financing institutions.
 
 PostgreSQL persists in a named volume. API/web containers run without root and published
 ports are loopback-only. JWT secrets come from configuration, never generated per worker.
 
-Milestone 3 adds LedgerClient and a PostgreSQL-backed MockLedgerClient. DrunixLedgerClient,
-Fabric private collections and authenticated external settlement events remain future work.
+Milestone 3 adds LedgerClient and a PostgreSQL-backed MockLedgerClient. DrunixLedgerClient
+remains future work; Go private-collection logic/configuration is now supplied in Milestone 7. Signed bank event ingestion is now implemented.
 Selecting Drunix returns 503 for ledger operations, without a mock fallback.
 
 
@@ -61,7 +61,7 @@ retry idempotent even after the asset advances.
 Registration acquires transaction-scoped advisory locks on asset ID and fingerprint, backed
 by unique constraints. Lifecycle changes use SELECT FOR UPDATE. Internal payment IDs are
 serialized and unique to reject replay. History is ordered by asset revision. Production
-chaincode must independently enforce these same rules in its later milestone.
+chaincode independently enforces the same state matrix in Milestone 7.
 
 Audits include generated request IDs (also returned as X-Request-ID), actors, action,
 receivable/asset references and allowlisted metadata. Invoice upload, lifecycle changes,
@@ -106,3 +106,41 @@ external payment integrations would require a separate reconciliation design in 
 The frontend adds a sanitized financier register and private offers panel to existing
 detail views. It shows acceptance terms before confirmation and labels every payout as
 sandbox simulation. The gateway allowlist includes only the added financing routes.
+
+## Settlement authentication and atomicity (Milestone 6)
+
+The CLI bank simulator holds an Ed25519 private key. The API receives only public keys
+through a registry binding each key ID to a bank ID and settlement organization. A valid
+signature authorizes only this bank's payment event. The organization must have an active
+settlement operator. Receipt reads still require JWT and organization authorization.
+
+The signature covers a protocol prefix and exact request bytes. Advisory transaction locks
+serialize event IDs/nonces across all assets. The service then locks the receivable,
+checks the ledger projection and calls MockLedgerClient.confirm_payment, which independently
+checks state, private invoice value, currency, role and event uniqueness. Database unique
+constraints backstop the locks. Receipt, private settlement reference, ledger history,
+projection and success audit commit together. Failure rolls back; a separate transaction
+records sanitized rejection. Storage/audit failure returns 503, never success.
+
+No private key is mounted in the API. Raw payment payloads are not persisted: payment_events
+stores their digest and receipt metadata; security_events stores rejections without trusting
+claimed actor/asset IDs. The security dashboard is Milestone 9. Public deployment requires
+later TLS, rate limits and retention controls; this prototype binds to loopback.
+
+## Go chaincode (Milestone 7)
+
+TradeCredContract now implements the PRD functions using the official Fabric Go contract
+API. It independently enforces MSP/role attributes, verifier attestation, fingerprint
+reservation, owner-only financing, state transitions and settlement-service authority.
+Private amounts enter via transient data and are committed in an exporter implicit
+collection, then copied into an isolated exporter/winning-bank collection at lock. Salted
+hash checks let authorized settlement endorsers validate expected amounts without public
+plaintext values. History/events contain sanitized asset state only.
+
+All timestamps come from proposals, all value arithmetic uses integers, and all endorsers
+use the same checked-in participant/collection profile. Tests check parity with Python's
+state matrix and currency units. Endorsement, actual MSP enrollment and Fabric MVCC commit
+behavior need real-network verification in Milestone 8. Existing application routes still
+use MockLedgerClient; no Go gateway or automatic realization/closure has been added.
+
+See [contract interface and deployment requirements](../blockchain/chaincode/tradecred/README.md).

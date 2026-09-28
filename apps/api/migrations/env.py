@@ -8,6 +8,7 @@ from app.core.database import create_database_engine
 from app.models import (
     financing,  # noqa: F401
     ledger,  # noqa: F401
+    settlement,  # noqa: F401
 )
 from app.models.domain import Base
 

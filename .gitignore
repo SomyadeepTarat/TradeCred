@@ -17,3 +17,5 @@ data/
 .DS_Store
 test-results/
 playwright-report/
+
+/blockchain/chaincode/tradecred/build/

@@ -218,8 +218,7 @@ class MockLedgerClient:
     async def confirm_payment(
         self, asset_id: str, event_id: str, amount_minor: int, currency: str, reference: str
     ) -> LedgerReceipt:
-        # Internal adapter contract only. No settlement endpoint is exposed in Milestone 3.
-        # The future settlement service must authenticate the signed event before this call.
+        # Internal adapter contract: SettlementService verifies the signed event first.
         if self.actor.role != Role.SETTLEMENT_OPERATOR:
             raise APIError(403, "UNAUTHORIZED_ROLE", "Settlement identity required.")
         if (

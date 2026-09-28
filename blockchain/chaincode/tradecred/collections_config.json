@@ -1,0 +1,50 @@
+[
+  {
+    "name": "ExporterBankCollectionAlphaCiti",
+    "policy": "OR('ExporterAlphaMSP.member','CitiDemoMSP.member')",
+    "requiredPeerCount": 1,
+    "maxPeerCount": 2,
+    "blockToLive": 0,
+    "memberOnlyRead": true,
+    "memberOnlyWrite": true,
+    "endorsementPolicy": {
+      "signaturePolicy": "AND('ExporterAlphaMSP.peer','CitiDemoMSP.peer')"
+    }
+  },
+  {
+    "name": "ExporterBankCollectionAlphaNbfc",
+    "policy": "OR('ExporterAlphaMSP.member','NbfcDemoMSP.member')",
+    "requiredPeerCount": 1,
+    "maxPeerCount": 2,
+    "blockToLive": 0,
+    "memberOnlyRead": true,
+    "memberOnlyWrite": true,
+    "endorsementPolicy": {
+      "signaturePolicy": "AND('ExporterAlphaMSP.peer','NbfcDemoMSP.peer')"
+    }
+  },
+  {
+    "name": "ExporterBankCollectionBetaCiti",
+    "policy": "OR('ExporterBetaMSP.member','CitiDemoMSP.member')",
+    "requiredPeerCount": 1,
+    "maxPeerCount": 2,
+    "blockToLive": 0,
+    "memberOnlyRead": true,
+    "memberOnlyWrite": true,
+    "endorsementPolicy": {
+      "signaturePolicy": "AND('ExporterBetaMSP.peer','CitiDemoMSP.peer')"
+    }
+  },
+  {
+    "name": "ExporterBankCollectionBetaNbfc",
+    "policy": "OR('ExporterBetaMSP.member','NbfcDemoMSP.member')",
+    "requiredPeerCount": 1,
+    "maxPeerCount": 2,
+    "blockToLive": 0,
+    "memberOnlyRead": true,
+    "memberOnlyWrite": true,
+    "endorsementPolicy": {
+      "signaturePolicy": "AND('ExporterBetaMSP.peer','NbfcDemoMSP.peer')"
+    }
+  }
+]

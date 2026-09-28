@@ -22,7 +22,9 @@ const guidance: Record<string, string> = {
   LOCKED:
     "An offer is accepted and this receivable is locked. The assigned institution can record a simulated disbursement.",
   FINANCED:
-    "Financing is recorded with an explicit sandbox payout. Signed settlement is not available yet.",
+    "Financing is recorded with an explicit sandbox payout. Awaiting an authenticated bank settlement event.",
+  PAYMENT_CONFIRMED:
+    "Inward payment confirmed by an authenticated bank event. No funds are moved by TradeCred.",
   FINANCE_AVAILABLE:
     "This receivable is open for financing. Institutions can submit offers; the exporter can accept one.",
 };
@@ -384,8 +386,9 @@ export function ReceivableDetail({ id }: { id: string }) {
               <section className="panel">
                 <h2>Settlement status</h2>
                 <p>
-                  Signed settlement actions are not available yet. Financing
-                  details are shown above.
+                  {row.status === "PAYMENT_CONFIRMED"
+                    ? "Inward payment confirmed. Remittance reference linked."
+                    : "Awaiting a verified signed bank settlement event."}
                 </p>
                 <p className="muted">
                   {row.ebrc_status

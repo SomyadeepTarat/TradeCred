@@ -1,7 +1,7 @@
 [project]
 name = "tradecred-api"
-version = "0.6.0"
-description = "TradeCred API — Financing"
+version = "0.7.0"
+description = "TradeCred API — Settlement Security"
 requires-python = ">=3.12"
 dependencies = [
   "fastapi>=0.115,<1",
@@ -15,6 +15,7 @@ dependencies = [
   "python-multipart>=0.0.20,<1",
   "pypdf>=6,<7",
   "iso4217>=1.14,<2",
+  "cryptography>=44,<47",
 ]
 
 [dependency-groups]

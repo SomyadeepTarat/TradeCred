@@ -7,6 +7,7 @@ from app.models.ledger import AuditEvent
 
 SAFE_FIELDS = {
     "fingerprint",
+    "eventId",
     "offerId",
     "agreementHash",
     "paymentId",
