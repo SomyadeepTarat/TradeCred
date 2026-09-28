@@ -13,7 +13,7 @@ db:
 	docker compose up -d --wait postgres
 
 api:
-	$(API) uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+	$(API) uvicorn app.main:app --no-access-log --reload --host 127.0.0.1 --port 8000
 
 web:
 	$(WEB) run dev
@@ -30,17 +30,17 @@ test-integration:
 	$(API) pytest -m integration
 
 lint: lint-chaincode lint-gateway
-	$(API) ruff check . ../../scripts/seed_demo.py ../../scripts/seed_fixtures.py ../../scripts/test_ui.py ../../scripts/generate_keys.py ../../services/bank-simulator
-	$(API) ruff format --check . ../../scripts/seed_demo.py ../../scripts/seed_fixtures.py ../../scripts/test_ui.py ../../scripts/generate_keys.py ../../services/bank-simulator
+	$(API) ruff check . ../../scripts/test_setup.py ../../scripts/seed_demo.py ../../scripts/seed_fixtures.py ../../scripts/test_ui.py ../../scripts/generate_keys.py ../../services/bank-simulator
+	$(API) ruff format --check . ../../scripts/test_setup.py ../../scripts/seed_demo.py ../../scripts/seed_fixtures.py ../../scripts/test_ui.py ../../scripts/generate_keys.py ../../services/bank-simulator
 	$(API) mypy app
 	$(WEB) run lint
 	$(WEB) run typecheck
 	$(WEB) run format:check
 
 format: format-chaincode format-gateway
-	$(API) ruff format . ../../scripts/seed_demo.py ../../scripts/seed_fixtures.py ../../scripts/test_ui.py ../../scripts/generate_keys.py ../../services/bank-simulator
-	$(API) ruff check --fix . ../../scripts/seed_demo.py ../../scripts/seed_fixtures.py ../../scripts/test_ui.py ../../scripts/generate_keys.py ../../services/bank-simulator
-	$(API) ruff format . ../../scripts/seed_demo.py ../../scripts/seed_fixtures.py ../../scripts/test_ui.py ../../scripts/generate_keys.py ../../services/bank-simulator
+	$(API) ruff format . ../../scripts/test_setup.py ../../scripts/seed_demo.py ../../scripts/seed_fixtures.py ../../scripts/test_ui.py ../../scripts/generate_keys.py ../../services/bank-simulator
+	$(API) ruff check --fix . ../../scripts/test_setup.py ../../scripts/seed_demo.py ../../scripts/seed_fixtures.py ../../scripts/test_ui.py ../../scripts/generate_keys.py ../../services/bank-simulator
+	$(API) ruff format . ../../scripts/test_setup.py ../../scripts/seed_demo.py ../../scripts/seed_fixtures.py ../../scripts/test_ui.py ../../scripts/generate_keys.py ../../services/bank-simulator
 	$(WEB) run format
 
 build:
@@ -59,8 +59,7 @@ seed-fixtures:
 	uv run --frozen --project apps/api python scripts/seed_fixtures.py
 
 reset:
-	@echo "reset is reserved for Milestone 10; existing demo data is preserved."
-	@exit 2
+	CONFIRM="$(CONFIRM)" bash scripts/reset_demo.sh
 
 test-e2e: build
 	uv run --frozen --project apps/api python scripts/test_ui.py
@@ -104,3 +103,7 @@ drunix-preflight:
 
 drunix-package:
 	bash blockchain/network/scripts/package.sh
+
+.PHONY: test-setup seed-fixtures
+test-setup:
+	uv run --frozen --project apps/api python scripts/test_setup.py

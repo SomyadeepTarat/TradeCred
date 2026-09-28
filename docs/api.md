@@ -273,3 +273,15 @@ with `accepted=false` for a rejected signed event. `uncertain=true` means availa
 prevented confirming the outcome; use the same replay ID to recover. The public settlement
 webhook retains its existing HTTP error semantics. Disabled simulator returns 404; missing
 signing configuration or signer failure returns 503 before any submission.
+
+
+## Error and request correlation contract (Milestone 10)
+
+All API errors use `{error: {code, message, details, requestId}}` with `Cache-Control: no-store`
+and `X-Request-ID`. The server generates the identifier; caller-supplied IDs are not trusted.
+Validation uses 422 `INVALID_REQUEST` without echoing input values. Unknown routes use
+404 `NOT_FOUND`; unsupported methods use 405 `METHOD_NOT_ALLOWED`. Unexpected exceptions
+return 500 `INTERNAL_ERROR` without internal messages, SQL or tracebacks. Authentication
+401 responses retain the Bearer challenge. Existing domain error codes/statuses are preserved.
+Browser gateway failures use the same envelope and generate their own request ID when the
+API was not contacted. Responses from the API preserve its correlation header/body.

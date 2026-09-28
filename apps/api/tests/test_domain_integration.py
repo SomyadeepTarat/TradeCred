@@ -43,7 +43,14 @@ def test_bad_credentials_disabled_users_and_current_roles(database: Engine) -> N
             "/api/v1/auth/login", json={"email": "absent@tradecred.demo", "password": "wrong"}
         )
         assert wrong.status_code == unknown.status_code == 401
-        assert wrong.json() == unknown.json()
+
+        def public_error(response):
+            error = response.json()["error"]
+            assert error.pop("requestId") == response.headers["X-Request-ID"]
+            return error
+
+        assert public_error(wrong) == public_error(unknown)
+        assert wrong.headers["X-Request-ID"] != unknown.headers["X-Request-ID"]
         headers = login(client, "admin@tradecred.demo")
         with Session(database) as session, session.begin():
             user = session.scalar(select(User).where(User.email == "admin@tradecred.demo"))
@@ -58,7 +65,7 @@ def test_bad_credentials_disabled_users_and_current_roles(database: Engine) -> N
         inactive = client.post(
             "/api/v1/auth/login", json={"email": "admin@tradecred.demo", "password": PASSWORD}
         )
-        assert inactive.json() == wrong.json()
+        assert public_error(inactive) == public_error(wrong)
         assert inactive.status_code == 401
         assert (
             client.get("/api/v1/auth/me", headers={"Authorization": "Bearer tampered"}).status_code

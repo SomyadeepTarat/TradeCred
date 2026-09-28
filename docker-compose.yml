@@ -7,7 +7,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tradecred_local}
       POSTGRES_DB: ${POSTGRES_DB:-tradecred}
     ports:
-      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -40,9 +40,9 @@ services:
         source: ./data/bank-public
         target: /bank-public
         read_only: true
-    command: ["sh", "-c", ".venv/bin/alembic upgrade head && exec .venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+    command: ["sh", "-c", ".venv/bin/alembic upgrade head && exec .venv/bin/uvicorn app.main:app --no-access-log --host 0.0.0.0 --port 8000"]
     ports:
-      - "127.0.0.1:8000:8000"
+      - "127.0.0.1:${API_PORT:-8000}:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -64,7 +64,7 @@ services:
     volumes:
       - ./data/bank-keys:/bank-keys:ro
     ports:
-      - "127.0.0.1:8090:8090"
+      - "127.0.0.1:${SIMULATOR_PORT:-8090}:8090"
     healthcheck:
       test: ["CMD", "/app/.venv/bin/python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8090/health')"]
       interval: 5s
@@ -75,7 +75,7 @@ services:
     environment:
       API_INTERNAL_URL: http://api:8000
     ports:
-      - "127.0.0.1:3000:3000"
+      - "127.0.0.1:${WEB_PORT:-3000}:3000"
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
       interval: 10s

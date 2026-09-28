@@ -1,6 +1,6 @@
 # Threat model
 
-Milestones 0–6 provide authentication, document integrity, mock ledger state enforcement
+Milestones 0–10 provide authentication, document integrity, mock ledger state enforcement
 and the receivables UI. The controls below distinguish implemented behavior from future protections.
 
 | Threat | Required mitigation and implementation milestone |
@@ -17,7 +17,7 @@ Current controls: localhost-only Compose ports, ignored environment files, non-r
 API/web containers, readiness failure without credential disclosure, and real database
 connectivity tests. JWT authentication and admin-only organization access are implemented. Authenticated users are reloaded from PostgreSQL so disabled accounts and removed roles cannot retain access. Login throttling, broader security audit logging, password recovery and token revocation beyond account deactivation are not implemented yet. Local
 sample database credentials are not production credentials. Do not expose this stack
-as a production service. Future logs must exclude tokens, keys, accounts and document bytes.
+as a production service. Request logs exclude tokens, keys, bank accounts and document bytes.
 
 
 Uploads have total request and file limits, one-file/one-field limits, strict PDF parsing,
@@ -110,3 +110,16 @@ events exercise the same verification service as external events. Exact event by
 stored privately, and replay is scoped to the submitting user. Audit/security feeds require
 admin access and do not expose raw event bodies, signatures or private invoice amounts.
 The signer is not a production bank authority; disable it outside private demonstrations.
+
+## Error, logging and reset boundaries (Milestone 10)
+
+Validation and unexpected errors omit raw input and exception text. Generated request IDs
+correlate sanitized errors and JSON request logs. Logs contain route templates, never raw
+query strings; standard API commands disable Uvicorn access logs. Authenticated identifiers
+remain operational metadata requiring restricted access and a deployment retention policy.
+
+Reset is a local mock-fixture maintenance operation, never a real-ledger rollback. It
+requires an explicit confirmation, rejects altered fixture terms and Drunix recovery data,
+and uses table locks and a single transaction. PDFs and audit/security evidence are retained;
+operators must define production retention separately. The fresh-setup test uses its own
+randomly named Compose project and deletes only that project's volumes.

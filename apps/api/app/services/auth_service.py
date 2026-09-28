@@ -2,6 +2,7 @@ from starlette.concurrency import run_in_threadpool
 
 from app.core.config import Settings
 from app.core.errors import APIError
+from app.core.logging import bind
 from app.models.domain import User
 from app.repositories.users import UserRepository
 from app.schemas.auth import TokenResponse
@@ -20,6 +21,7 @@ class AuthService:
         valid = await run_in_threadpool(verify_password, password, encoded)
         if user is None or not valid or not user.is_active:
             raise APIError(401, "INVALID_CREDENTIALS", "Invalid email or password.")
+        bind(user_id=str(user.id), org_id=user.organization_id)
         return TokenResponse(
             access_token=issue_access_token(user.id, self.settings),
             expires_in=self.settings.jwt_access_token_minutes * 60,

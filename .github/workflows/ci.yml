@@ -46,3 +46,16 @@ jobs:
       - run: cd apps/web && npx playwright install --with-deps chromium
       - run: make test-e2e
       - run: docker compose config --quiet
+
+  fresh-demo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.7.22"
+          python-version: "3.12"
+      - run: make test-setup

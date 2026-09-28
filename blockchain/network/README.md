@@ -39,7 +39,7 @@ Missing configuration, connection failures and unknown commit outcomes never sel
    exact JSON network ID, `DRUNIX_CHANNEL`, `DRUNIX_CHAINCODE_NAME=tradecred`, and
    `LEDGER_BACKEND=drunix`. For host API execution use
    `DRUNIX_GATEWAY_URL=http://127.0.0.1:8080`; Compose uses
-   `DRUNIX_GATEWAY_DOCKER_URL=http://drunix-gateway:8080`.
+   `DRUNIX_DOCKER_GATEWAY_URL=http://drunix-gateway:8080`.
 6. Run `docker compose --profile drunix build drunix-gateway`, then
    `make drunix-preflight`. Preflight only parses configuration and credential files;
    success does **not** verify connectivity, certificate authorization or a transaction.

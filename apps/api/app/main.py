@@ -2,6 +2,8 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException
 
 from app.api.routes.auth import router as auth_router
 from app.api.routes.demo import router as demo_router
@@ -13,13 +15,20 @@ from app.api.routes.receivables import router as receivables_router
 from app.api.routes.settlement import router as settlement_router
 from app.core.config import Settings
 from app.core.database import create_database_engine
-from app.core.errors import APIError, api_error_handler
+from app.core.errors import (
+    APIError,
+    api_error_handler,
+    http_error_handler,
+    validation_error_handler,
+)
+from app.core.logging import configure_logging
 from app.core.request_id import RequestIdMiddleware
 from app.core.upload_limits import UploadLimitMiddleware
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     config = settings or Settings()
+    configure_logging()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -31,7 +40,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         finally:
             await engine.dispose()
 
-    application = FastAPI(title="TradeCred API", version="0.9.0", lifespan=lifespan)
+    application = FastAPI(title="TradeCred API", version="0.10.0", lifespan=lifespan)
     application.include_router(router, prefix="/api/v1")
     application.include_router(auth_router, prefix="/api/v1")
     application.include_router(organizations_router, prefix="/api/v1")
@@ -43,6 +52,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     application.include_router(demo_router, prefix="/api/v1")
     application.add_middleware(RequestIdMiddleware)
     application.add_exception_handler(APIError, api_error_handler)
+    application.add_exception_handler(RequestValidationError, validation_error_handler)
+    application.add_exception_handler(HTTPException, http_error_handler)
     return application
 
 

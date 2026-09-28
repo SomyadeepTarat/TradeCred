@@ -87,8 +87,9 @@ Run `make test`, `make test-integration`, `make lint`, and `make test-e2e`. Brow
 exercise competing finance, the registry warning, invalid/valid signatures, replay, closure
 and security feed using an isolated database and real temporary signing keys.
 
-`make reset` remains Milestone 10 and intentionally exits nonzero. To demonstrate a new
-cycle without deleting existing records, upload a new invoice number. Keep the development
+`make reset` previews the four mock fixture targets. Apply with `make reset CONFIRM=RESET-DEMO`,
+then run `make demo` to reseed. Accounts, unrelated records, audit/security evidence and keys
+are preserved. Drunix reset is refused. To avoid deleting any records, upload a new invoice number. Keep the development
 stack private. Stop it with `docker compose --profile demo down`; data is retained.
 `make dev` without the demo override disables the simulator API unless SIMULATOR_ENABLED
 was explicitly set true in `.env`. Existing keys and signatures remain private.

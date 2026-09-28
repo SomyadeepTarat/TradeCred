@@ -1,7 +1,7 @@
 # Architecture and implementation status
 
-Milestones 0–5 provide Next.js, FastAPI and PostgreSQL 16. The frontend provides an
-exporter workspace and a sanitized administrator verification view.
+Milestones 0–10 provide Next.js, FastAPI and PostgreSQL 16. The frontend provides
+exporter, financier, settlement and administrator workspaces.
 
 FastAPI creates an async SQLAlchemy engine during lifespan and disposes it on shutdown.
 Requests receive scoped sessions. Routes delegate authentication to AuthService and user
@@ -67,8 +67,8 @@ Audits include generated request IDs (also returned as X-Request-ID), actors, ac
 receivable/asset references and allowlisted metadata. Invoice upload, lifecycle changes,
 registry checks and duplicate rejections are recorded. Successful changes share their
 transaction with their audit; rejected duplicates are recorded after rollback. Existing
-pre-Milestone-3 records are not backfilled with invented history. Authentication/security
-hardening remains future work. Application routes do not expose audit updates or deletes;
+pre-Milestone-3 records are not backfilled with invented history.
+Application routes do not expose audit updates or deletes;
 a database administrator can still alter the mock tables.
 
 
@@ -164,3 +164,19 @@ SettlementService, so all existing signature, timestamp, replay and ledger check
 Administrator review exposes the final three existing ledger transitions. Seed fixtures
 run through public application APIs, generating genuine mock ledger history, agreements,
 disbursement records and signature-verified settlement rather than editing status columns.
+
+## Hardening (Milestone 10)
+
+ASGI middleware generates request IDs, normalizes unexpected failures and emits JSON
+completion logs with route templates and allowlisted context. Authentication, audits and
+verified settlement processing bind known actor/asset/transaction/event IDs. Exceptions,
+query strings and input values are excluded. Logs describe requests; committed database
+audits remain the business outcome record. Next.js generates equivalent errors for local
+proxy failures and preserves upstream error request IDs.
+
+The reset CLI previews four named fixtures by default. Explicit confirmation stops the
+Compose API and removes only matching mock fixtures in a locked database transaction.
+It refuses real-ledger bindings/recovery inputs and retains accounts, private files and
+audit/security evidence. Fresh-setup acceptance exercises install, startup, preview, reset
+and idempotent API reseeding in a disposable Compose project, independently of unit,
+PostgreSQL integration and production-build browser suites.

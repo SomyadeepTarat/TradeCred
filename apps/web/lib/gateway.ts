@@ -11,9 +11,23 @@ const allowedPost = new RegExp(
 );
 
 function error(status: number, message: string) {
+  const requestId = crypto.randomUUID();
+  const code =
+    (
+      {
+        401: "AUTHENTICATION_REQUIRED",
+        403: "ORIGIN_REJECTED",
+        404: "NOT_FOUND",
+        413: "UPLOAD_TOO_LARGE",
+        503: "API_UNAVAILABLE",
+      } as Record<number, string>
+    )[status] || "REQUEST_FAILED";
   return NextResponse.json(
-    { error: { message } },
-    { status, headers: { "Cache-Control": "no-store" } },
+    { error: { code, message, details: {}, requestId } },
+    {
+      status,
+      headers: { "Cache-Control": "no-store", "X-Request-ID": requestId },
+    },
   );
 }
 

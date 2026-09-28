@@ -1,8 +1,8 @@
 from starlette.datastructures import Headers
-from starlette.responses import JSONResponse
+from starlette.requests import Request
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from app.core.errors import APIError
+from app.core.errors import APIError, error_response
 
 
 class UploadLimitMiddleware:
@@ -22,15 +22,8 @@ class UploadLimitMiddleware:
             return
         size = Headers(scope=scope).get("content-length")
         if size is not None and (not size.isdecimal() or int(size) > self.max_bytes):
-            response = JSONResponse(
-                status_code=413,
-                content={
-                    "error": {
-                        "code": "UPLOAD_TOO_LARGE",
-                        "message": "Upload exceeds the request size limit.",
-                        "details": {},
-                    }
-                },
+            response = error_response(
+                Request(scope), 413, "UPLOAD_TOO_LARGE", "Upload exceeds the request size limit."
             )
             await response(scope, receive, send)
             return

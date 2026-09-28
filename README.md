@@ -1,353 +1,199 @@
 # TradeCred
 
 Receivable trust infrastructure for MSME trade finance, targeting NPCI Drunix.
-[The PRD](tradecred_prd_codex.md) is the source of truth. **Milestones 0–9 are implemented.**
+[The PRD](tradecred_prd_codex.md) is the project source of truth. Milestones 0–10 are implemented.
 
 Fragmented institutional records create duplicate-financing and reconciliation risk.
-The application combines deterministic fingerprints, a shared registry, financing
-locks, agreement hashes and authenticated settlement records. The ledger backend is configurable; payments remain explicit sandbox simulations. Signed bank settlement events are verified with Ed25519. Exporters can now create
-drafts by uploading PDFs with deterministic invoice fingerprints and integrity hashes, then submit,
-verify (as admin), register, and open them for financing in the explicit mock ledger.
+TradeCred combines deterministic invoice fingerprints, a shared registry, financing locks,
+agreement hashes and authenticated settlement events. It demonstrates a consortium workflow
+from invoice upload to closure, with confidential documents kept off the ledger.
 
-## Implemented architecture
+## Architecture and features
 
 ```text
-Browser --> Next.js :3000 (role workspaces + same-origin session gateway)
-API client --> FastAPI :8000 --> PostgreSQL 16 :5432
-                  | JWT / Argon2 / role checks
-                  | organizations / users / receivable schema
-                  |--> explicit MockLedgerClient or Drunix gateway
-                  |--> sandbox signer :8090 (private key, optional demo profile)
+Browser → Next.js :3000 → FastAPI :8000 → PostgreSQL :5432
+           session cookie    JWT/RBAC        metadata, audits, replay protection
+                               ├─ private PDF storage
+                               ├─ MockLedgerClient (explicit local simulation)
+                               ├─ DrunixLedgerClient → Fabric Gateway → provisioned network
+                               └─ sandbox signer :8090 (optional; private key stays here)
 ```
 
-Implemented: liveness/readiness, organization/user/receivable/document SQL models, Alembic migrations,
-seeded demo identities, JWT login, authenticated identity lookup, admin-only organization
-listing, reusable role dependencies, private PDF storage, upload/download/integrity APIs,
-MockLedgerClient, lifecycle transitions, idempotent registration, registry lookup, audit history,
-tests, linting, CI, and Docker Compose.
-The frontend supports sign-in, exporter dashboard, upload, receivable detail, registry results,
-PDF integrity/download, and lifecycle actions. Administrators have a verification workspace.
-Financing offers, acceptance and sandbox disbursement are implemented. Authenticated settlement advances financed assets to PAYMENT_CONFIRMED.
+- Exporter dashboard, PDF upload/integrity checks and canonical business fingerprinting.
+- Sanitized financier workspace, competing offers, single acceptance, lock and agreement hash.
+- Explicit mock disbursement; no funds move.
+- Registry checker for duplicate/financing status across participating organizations.
+- Ed25519 settlement validation, timestamp window, amount/currency checks and replay protection.
+- Administrator verification, realization, e-BRC eligibility and closure; recorded lifecycle timeline.
+- Admin audit/security feeds; consistent errors and redacted JSON request logs.
+- Go chaincode, authenticated Fabric Gateway bridge and explicit mock mode without silent fallback.
+- API-driven demo fixtures, scoped reset, unit/integration/browser tests and fresh-setup acceptance.
 
-## Setup
+## First setup and working demo
 
-Requirements: Node.js 22+, npm, Python 3.12+, uv, Docker with Compose v2.
+Requirements: Node.js 22+, npm, Python 3.12+, `uv`, Docker Desktop running, Docker Compose
+v2.17+ (service build contexts). Go 1.26+ is optional; Go checks use a pinned Docker toolchain
+when Go is unavailable locally. Initial installation/build needs network access.
 
 ```sh
-cp .env.example .env  # First setup only; preserve an existing .env
+cp .env.example .env             # First setup only; preserve an existing .env
 make install
-make dev
-make seed
+make demo
 ```
 
-`make dev` starts PostgreSQL, applies migrations before starting the API, and builds the
-web service. Seeding is explicit; it never happens during API startup. Open
-http://localhost:3000 and http://localhost:8000/docs. `make seed` uses your host Python
-installation and the root `.env`; no passwords are printed.
+Open [TradeCred](http://localhost:3000) or [API docs](http://localhost:8000/docs).
+`make demo` generates missing signing keys/token, builds API/web/signer, starts PostgreSQL,
+applies migrations, seeds users, and creates four demo receivables through authenticated APIs.
+No manual database edits are required. Follow [the three demo scenarios](docs/demo-script.md).
 
-For local hot reload:
+The example credentials are **local-demo credentials only**. Set a private `JWT_SECRET`
+(minimum 32 characters) and `DEMO_PASSWORD` (minimum 12 characters) before sharing an
+installation. Keep `.env`, `data/`, private keys and generated demo files out of Git.
+`make keys` preserves existing complete keypairs and creates the internal simulator token
+if missing; it never prints private keys or tokens. Incomplete keypairs fail without overwriting.
+
+| Identity | Role | Organization |
+| --- | --- | --- |
+| exporter@tradecred.demo | EXPORTER | Alpha Looms Demo |
+| bank@tradecred.demo | FINANCIER | Cedar Finance Demo |
+| nbfc@tradecred.demo | FINANCIER | Maple Credit Demo |
+| settlement@tradecred.demo | SETTLEMENT_OPERATOR | Harbor Settlement Demo |
+| admin@tradecred.demo | ADMIN | TradeCred Demo Consortium |
+
+New accounts use `DEMO_PASSWORD`; existing passwords, roles and active flags are preserved.
+Changing the environment password does not reset accounts. All company/customer data is fictional.
+
+Fixtures: EXP-2026-1042 (flagship, available), DEMO-VERIFIED-01, DEMO-FINANCED-01 and
+DEMO-REALIZED-01. Each is EUR 10,800; the mock financing advance is EUR 9,750, with no FX
+conversion. Generated PDF/JSON examples and IDs are in `data/demo/`. `make seed-fixtures`
+resumes interrupted setup without rewinding advanced records. `make seed` creates users only.
+
+## Configuration and development
+
+The root `.env` is loaded independently of the working directory. Environment variables
+have precedence. JWT lifetime defaults to 30 minutes (configurable from 1–60).
+
+- `DATABASE_URL`: host-side PostgreSQL URL (`postgresql+psycopg://`).
+- `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`: Compose database credentials.
+  The API container always uses the Compose database; existing volumes retain their credentials.
+- `LEDGER_BACKEND=mock`: explicit PostgreSQL simulation with `MOCK-` transaction IDs.
+- `SIMULATOR_ENABLED=false`: default. `make demo` enables the optional signer for its
+  Compose invocation; ordinary `make dev` leaves the simulator API disabled unless explicitly enabled.
+- `DOCUMENT_STORAGE_PATH`: host PDF directory; Docker uses a private named volume.
+- `BANK_TRUSTED_KEYS`: public-key registry for host API. Docker mounts the demo public key only.
+- `POSTGRES_PORT`, `API_PORT`, `WEB_PORT`, `SIMULATOR_PORT`: optional loopback port overrides.
+  When changing ports, update host `DATABASE_URL` and `DEMO_API_URL` consistently.
+
+For hot reload:
 
 ```sh
 make db
 make migrate
 make seed
-make api
-# In another terminal:
-make web
+make api                       # Terminal 1, localhost:8000
+make web                       # Terminal 2, localhost:3000
 ```
 
-The root `.env` is loaded regardless of working directory; environment variables take
-precedence. `JWT_SECRET` is required and must contain at least 32 characters. The example
-signing key and password are local-demo credentials only. Generate a private signing key
-before using a shared environment, for example `python3 -c 'import secrets; print(secrets.token_urlsafe(48))'`,
-and place it in your ignored `.env`. Never commit secrets. JWTs expire in 30 minutes by
-default (`JWT_ACCESS_TOKEN_MINUTES`, allowed range 1–60).
-
-`POSTGRES_*` configure Compose. `DATABASE_URL` configures host-side API/migration/seed
-commands; use `postgresql+psycopg://`. Compose overrides the API's database host to
-`postgres`. Existing volumes retain their original PostgreSQL credentials.
-Drunix and sandbox bank settings are documented in `.env.example` and their service guides.
-
-## Demo identities and authentication
-
-| Email | Role | Organization |
-| --- | --- | --- |
-| exporter@tradecred.demo | EXPORTER | ORG_EXPORTER_ALPHA |
-| bank@tradecred.demo | FINANCIER | ORG_BANK_CITI_DEMO |
-| nbfc@tradecred.demo | FINANCIER | ORG_BANK_NBFC_DEMO |
-| settlement@tradecred.demo | SETTLEMENT_OPERATOR | ORG_SETTLEMENT_BANK |
-| admin@tradecred.demo | ADMIN | ORG_CONSORTIUM_ADMIN |
-
-All new demo users receive `DEMO_PASSWORD` (minimum 12 characters); the example value is
-`TradeCred-Demo-2026!`. Seed also creates exporter Beta and a second financier organization.
-Names are fictional. Rerunning seed creates missing identities but preserves existing
-passwords, roles, and active flags. Changing `DEMO_PASSWORD` does not reset existing users.
-
-Use `/docs` to call `POST /api/v1/auth/login` with JSON `email` and `password`, copy the
-returned access token into **Authorize**, then call `GET /api/v1/auth/me`.
-`GET /api/v1/organizations` returns actual organizations for ADMIN only; other roles
-receive 403 and anonymous requests receive 401. No roles supplied by a client are trusted.
-See [API documentation](docs/api.md) for examples and security details.
-
-## Migrations, checks, and stopping
+For the browser settlement simulator, use `make demo`, or follow the
+[signer service guide](services/bank-simulator/README.md) for host configuration.
+For signed command-line events:
 
 ```sh
-make migrate          # Alembic upgrade head; does not seed users
-make seed             # Organizations/users only, no receivables
-make test             # API unit tests and frontend render test; no DB required
-make test-integration # Real PostgreSQL; creates/drops isolated test schemas
-make lint             # Ruff, mypy, ESLint, TypeScript, Prettier
-make build
-make format
-```
-
-Integration tests require a database role with schema-creation permission. They verify
-migration upgrade/downgrade/upgrade, metadata alignment, constraints, seed idempotency,
-all role logins, role changes, and account deactivation without altering demo tables.
-Never run migration downgrades against data you want to keep. Tests only downgrade their
-own generated schemas. The migration creates tables and enums; API startup never uses
-`create_all`. CI runs tests, checks, migrations, seeding, and the frontend build.
-
-`docker compose down` stops services and retains database data. Published ports bind to
-localhost. Both API and web containers run without root. Health endpoints:
-`/api/v1/health` (liveness) and `/api/v1/health/ready` (real `SELECT 1`, 503 on failure).
-
-## Boundaries and limitations
-
-- Upload creates DRAFT receivables. Separate lifecycle endpoints require a stored, intact
-  PDF before submission, verification and registration. Legacy drafts without PDFs cannot advance.
-- `LEDGER_BACKEND=mock` uses PostgreSQL-backed MockLedgerClient. Responses identify
-  `backend: mock` and transaction IDs start with `MOCK-`. This is a simulation.
-- `LEDGER_BACKEND=drunix` selects the authenticated Fabric Gateway bridge. Missing configuration,
-  connection failures or unconfirmed commits fail closed with 503; there is no silent fallback.
-  Live Drunix compatibility is unverified. See [network setup](blockchain/network/README.md).
-- `make demo` starts the sandbox demo and seeds fixtures through API workflows.
-  `make reset` remains Milestone 10. Payments remain explicit simulations; settlement consumes signed bank events.
-- Authentication has no registration, password-reset, refresh-token, or logout-revocation
-  flow. Login rate limiting and broader security audit logging remain hardening work. Keep the
-  development stack private. Deactivated users lose access immediately.
-- Next.js's current lint plugins require ESLint 9, which emits an upstream support warning;
-  ESLint 10 is incompatible with their current React rules. The locked npm audit is clean.
-
-TradeCred is a prototype, not production-ready or regulator-approved. It does not replace
-TReDS, guarantee prevention of off-network fraud, move FX, issue e-BRC certificates, or
-make token state a legal assignment. Read [regulatory boundaries](docs/regulatory-boundaries.md).
-
-[Architecture](docs/architecture.md) · [Threat model](docs/threat-model.md) ·
-[Milestone 0 report](docs/milestone-0.md) · [Milestone 1 report](docs/milestone-1.md) · [Milestone 2 report](docs/milestone-2.md) · [Milestone 3 report](docs/milestone-3.md) · [Milestone 4 report](docs/milestone-4.md) · [Milestone 5 report](docs/milestone-5.md) · [Milestone 6 report](docs/milestone-6.md) · [Milestone 7 report](docs/milestone-7.md)
-
-## Uploading and verifying invoices (Milestone 2)
-
-After login in `/docs`, authorize as the exporter and call `POST /api/v1/receivables`
-with multipart fields `metadata` (JSON text) and `document` (a PDF). Example metadata:
-
-```json
-{"buyerId":"BUYER-DE-001","invoiceNumber":"EXP-2026-1042","invoiceDate":"2026-09-21","currency":"EUR","amount":"10800.00","dueDate":"2026-11-25"}
-```
-
-The exporter organization comes from authentication, not the request. A 201 response
-contains draft/document IDs, `document_hash`, `invoice_fingerprint`, currency and integer
-minor units. Amounts must be decimal **strings**, never JSON floating-point values.
-A duplicate canonical invoice returns 409 based on the local database unique constraint;
-this is not a consortium registry lookup or a claim of financing eligibility.
-
-Using the returned draft ID, call `/api/v1/receivables/{id}/document/integrity` or download
-`/api/v1/receivables/{id}/document`. Both require an exporter in the owning organization.
-Admins, financiers, settlement operators and other exporters cannot read raw PDFs.
-Downloads verify the hash first and return the unchanged bytes as an attachment.
-
-Host storage uses `DOCUMENT_STORAGE_PATH` (default `./data/documents`, relative to the
-repository root). Docker uses `/data/documents` on the persistent `document_data` volume.
-Keep database and document storage together: host and Docker modes use different stores;
-copy the corresponding document files if switching modes against the same database.
-No storage directory is publicly served or written to any ledger.
-
-`MAX_UPLOAD_BYTES` defaults to 10 MiB. Complete request bodies are limited to that plus
-64 KiB of multipart overhead, including chunked transfers. Only one PDF and one metadata
-field are accepted; metadata is limited to 16 KiB. PDFs must parse strictly, contain
-1–100 pages, and be unencrypted. Validation does not establish invoice authenticity or
-provide malware scanning, OCR, antivirus, or commercial verification.
-
-Read [TC-FP-1](docs/fingerprinting.md) for normalization and the fixed test vector.
-Filesystem writes and PostgreSQL commits cannot be atomic. Handled storage failures
-roll back the draft; an uncertain commit returns 503 and retains the file. A crash or
-uncertain commit can leave an orphan requiring manual reconciliation; no cleanup job
-exists yet. Ledger registration retries are idempotent; PDF uploads remain duplicate-rejected.
-
-## Mock ledger lifecycle (Milestone 3)
-
-Using `/docs` or an API client, upload an invoice as the exporter, then:
-
-1. Exporter: `POST /api/v1/receivables/{id}/submit`.
-2. Administrator: `POST /api/v1/receivables/{id}/verify`.
-3. Exporter or administrator: `POST /api/v1/receivables/{id}/register`.
-4. Exporter: `POST /api/v1/receivables/{id}/open-financing`.
-5. Owner or administrator: `GET /api/v1/receivables/{id}/history`.
-
-Any authenticated participant can call `POST /api/v1/registry/check` with the canonical
-invoice inputs (integer `amountMinor`) or `GET /api/v1/registry/fingerprint/{fingerprint}`.
-See [API details](docs/api.md). Registry results expose status and asset ID without exact
-amounts, buyer details, PDFs or storage keys. Eligibility is informational, not credit approval.
-Admin audit records are available at `GET /api/v1/audit/events`.
-
-The mock ledger, application projection and successful lifecycle audit commit in one
-PostgreSQL transaction. Concurrent fingerprint registration and asset locks are serialized.
-Registration retries return the original receipt without rewinding the current status.
-The mock survives restarts but provides neither distributed consensus nor tamper-proof
-history. Its private table is separate from sanitized projections, not a Fabric private
-collection. Financing APIs now use the internal lock operation. Signed settlement ingestion is implemented in Milestone 6.
-
-## Using the receivables UI (Milestone 4)
-
-Open http://localhost:3000 and sign in as `exporter@tradecred.demo` with the password used
-when seeding. The account selector supplies only the email; passwords are never embedded
-in the UI. An empty database displays an empty register, not synthetic financial activity.
-
-1. Choose **Create receivable**, enter invoice metadata and select an original PDF.
-2. The saved draft shows both full hashes and an actual registry check. An unavailable
-   registry displays an unknown status, never a clean result.
-3. Choose **Submit for verification**. Exporters cannot verify their own invoices.
-4. Sign out; sign in as `admin@tradecred.demo`. Open the submitted record and choose
-   **Verify invoice integrity**. The admin view hides buyer, invoice number, exact amount
-   and PDF download. Verification records an authorized decision and integrity check,
-   not commercial authenticity.
-5. Sign out; return as the exporter. Choose **Register receivable**, then optionally
-   **Open for financing**. The detail page shows the actual recorded timeline and mock IDs.
-6. Use **Check PDF integrity**, **Download PDF**, status filters and **Refresh** as needed.
-
-Dashboard counts cover all accessible records, regardless of the active table filter.
-Financed means outstanding FINANCED/OVERDUE/DISPUTED; payment-confirmed includes realized,
-e-BRC-eligible and closed. No amounts are summed across currencies. New read APIs return
-exact decimal strings to preserve 64-bit invoice amounts in JavaScript.
-
-The Next.js gateway stores the JWT in an HttpOnly, SameSite=Strict cookie and rejects
-cross-origin mutations. No JWT goes into localStorage or browser JavaScript. Sessions
-expire with the backend token; sign-out clears the cookie without revoking other tokens.
-Private responses use `Cache-Control: no-store`. HTTPS requests receive Secure cookies.
-The local prototype uses HTTP on loopback; shared deployments must terminate HTTPS and
-preserve the request scheme/Host at the Next.js server.
-
-Next.js reads `API_INTERNAL_URL` at runtime (default `http://127.0.0.1:8000`). Compose sets
-`http://api:8000`. For a custom host-side origin, export the variable before `make web`, or
-put it in `apps/web/.env.local`; the root `.env` is used by Compose/API, not automatically
-by Next.js. The origin is server-only and never exposed through a public environment variable.
-
-### Browser acceptance tests
-
-```sh
-cd apps/web
-npx playwright install chromium
-cd ../..
-make db
-make test-e2e
-```
-
-`make test-e2e` builds the production web app, creates an isolated PostgreSQL schema and
-temporary PDF storage, starts dedicated API/web servers on 8001/3001, and runs Chromium.
-It verifies upload → submit → admin verify → exporter register/open, hashes, download,
-registry result, timeline, duplicate rejection, session expiry and mobile overflow.
-The runner refuses occupied test ports and removes only its generated schema/storage.
-Screenshots are written under ignored `apps/web/test-results/`. CI installs Chromium and
-runs the same suite. No developer invoice records or files are touched.
-
-## Financing (Milestone 5)
-
-Run `make dev` and `make seed` to apply migration 0004 and add the second demo financier
-(`nbfc@tradecred.demo`) without resetting existing credentials. Both financiers use the
-password configured when their accounts were first seeded.
-
-1. As exporter, create, submit, obtain administrator verification, register and open a receivable.
-2. Sign in as `bank@tradecred.demo`. The financier workspace shows sanitized open assets,
-   value ranges and due dates. Open an asset and submit an advance, basis-point rate, tenor
-   and future expiry. Amounts are decimal strings in the **invoice currency**; no FX conversion
-   or automatic fee calculation occurs. Advances cannot exceed face value.
-3. Optionally sign in as `nbfc@tradecred.demo` and submit a competing offer.
-4. As exporter, review the offers and confirm one acceptance. The receivable becomes LOCKED;
-   other live offers are rejected and the canonical TC-AGR-1 agreement hash is recorded.
-5. As the winning institution, use **Assigned to us**, then **Simulate disbursement**.
-   The UI labels this **NPCI Payment Adapter — Sandbox Simulation**. A persisted MOCKPAY-
-   receipt and mock FINANCED transition are committed together. No funds move.
-6. The losing institution cannot disburse or create another offer. The registry reports
-   FINANCED and ineligible. Retrying acceptance or payout returns its existing receipt.
-
-Offers are accepted only for registered FINANCE_AVAILABLE assets, a stricter subset of
-verified receivables. Offers and canonical agreements are private to the owning exporter
-and relevant institution; admins see sanitized asset state and audit metadata, not terms.
-Financiers retain sanitized access to assets they previously offered on. Expired offers
-are shown as expired immediately and cannot be accepted; expiration is persisted during
-subsequent financing mutations. No expiry worker is required.
-
-Run `make test`, `make test-integration`, `make lint`, and `make test-e2e`. The browser suite
-now includes competing institutions, acceptance review, agreement display, winning-lender
-payout, duplicate financing rejection and mobile layout. All test data remains isolated.
-
-
-## Settlement security (Milestone 6)
-
-Run `make keys` once, then `make dev` and `make seed`. The bank simulator signs events
-with a local Ed25519 private key; Docker mounts only the public key in the API.
-For a financed EUR 10,800 invoice, replace TC-REPLACE with its asset ID:
-
-```sh
-make bank-event ARGS="--asset-id TC-REPLACE --amount-minor 1080000 --currency EUR --reference IRM-DEMO-938291 --invalid-signature"
 make bank-event ARGS="--asset-id TC-REPLACE --amount-minor 1080000 --currency EUR --reference IRM-DEMO-938291 --save data/payment-event.json"
 make bank-event ARGS="--replay data/payment-event.json"
 ```
 
-Expected: invalid signature rejected, valid event confirms payment, replay rejected.
-Refresh the asset to view PAYMENT_CONFIRMED and recorded ledger history. No funds move.
-The full invoice amount is required, not the advance amount; no FX conversion is assumed.
-See [simulator setup and protocol](services/bank-simulator/README.md) for host API
-configuration, key custody and retry semantics. The browser simulator and administrator realization/e-BRC eligibility/closure controls
-are available in Milestone 9.
+Use a FINANCED asset and replace TC-REPLACE with its actual ID. Replay of a consumed event
+is rejected; after five minutes it may be rejected as stale instead.
 
+## Drunix mode
 
-## Go chaincode (Milestone 7)
+Set `LEDGER_BACKEND=drunix` only after configuring a compatible provisioned network,
+identities, TLS roots and the authenticated gateway. See [network setup](blockchain/network/README.md)
+and [chaincode requirements](blockchain/chaincode/tradecred/README.md).
+
+The official Fabric SDK waits for VALID commit. Missing configuration, unavailable peers
+or unconfirmed outcomes fail closed; they never manufacture success or switch to mock.
+Durable private inputs and chaincode receipts allow exact-operation retries after lost
+responses or local projection failures. Assets remain bound to their original backend/network.
+Explicit fallback is `LEDGER_BACKEND=mock` with fresh assets; it does not migrate real assets.
+Live Drunix compatibility/endorsement/private-data behavior remains unverified without infrastructure.
+
+## Reset and repeat the demo
 
 ```sh
-make test-chaincode       # Race detection and coverage
-make lint-chaincode       # gofmt and go vet
-make build-chaincode      # Ignored build/tradecred executable
+make reset                     # Read-only preview of the four named fixture targets
+make reset CONFIRM=RESET-DEMO   # Apply the scoped reset and leave API stopped
+make demo                      # Restart and rebuild fixtures through the APIs
 ```
 
-These also run through make test / make lint and CI. Use Go 1.26+ or running Docker Desktop;
-without local Go, the runner uses a pinned Go container and persistent dependency caches.
-The first run needs network access to download the toolchain and dependencies.
+Reset removes only the four named Alpha mock fixtures and their offers, agreements,
+mock payouts, payment records and mock ledger rows. It verifies fixed invoice terms and
+refuses Drunix mode, real-ledger bindings or any durable Drunix recovery inputs in the database.
+Conflicting data causes the transaction to roll back. Stop host API processes before using
+reset; the script stops the Compose API after its read-only preflight.
 
-TradeCredContract enforces registration, duplicate blocking, lifecycle transitions,
-financing ownership, private commercial data and payment event uniqueness. See the
-[contract guide](blockchain/chaincode/tradecred/README.md) for functions, transient payloads,
-MSP attributes, collection policies and deployment prerequisites. Contract tests pass locally;
-no Drunix network is deployed, and the application continues to use explicit mock ledger mode.
+Accounts, passwords, unrelated receivables, signing keys, security events, signed simulator
+attempts and audit evidence are retained. Old audit detail links are retired. Stored PDFs
+are retained as private evidence rather than risking file deletion after an ambiguous commit;
+repeated resets consume some document storage. Reset is not a production data-retention tool
+and never alters a real network. It does not run automatically during startup or deployment.
 
+## Tests and acceptance
 
-## Drunix gateway (Milestone 8)
+```sh
+make test                      # API/web units and both Go race suites
+make test-integration          # Isolated PostgreSQL schemas; running local DB required
+make lint                      # Ruff, mypy, ESLint, TypeScript, Prettier, gofmt, vet
+make test-e2e                  # Production web build + isolated browser demo scenarios
+make test-setup                # Fresh copy → install → demo → preview/reset → reseed
+make build-chaincode build-gateway
+```
 
-The API can select `DrunixLedgerClient` using `LEDGER_BACKEND=drunix`, or explicitly use
-`MockLedgerClient` with `LEDGER_BACKEND=mock`. Existing verified assets remain bound to
-their original backend and network. Changing the environment does not migrate assets.
+Browser tests use dedicated ports 8001, 3001 and 8091, temporary PDFs/keys and an isolated
+schema. Fresh-setup acceptance uses a temporary source copy, generated secrets, random
+loopback ports and a unique Docker Compose project. Its cleanup removes only its own
+containers/volumes; your existing stack and data are untouched. CI runs both the regular
+suites and fresh demo acceptance. No test doubles are used in production integrations.
 
-See [setup and deployment](blockchain/network/README.md) and the
-[Milestone 8 report](docs/milestone-8.md) for configuration, recovery, validation and limitations.
-Run `make migrate`, `make test`, `make test-integration`, `make lint`, and `make test-e2e`.
-`make build-gateway` builds the bridge; `docker compose --profile drunix build drunix-gateway`
-builds its optional container. The default stack remains explicitly mock.
+API startup applies Alembic migrations in Compose; host execution uses `make migrate`.
+No startup `create_all` shortcut exists. Integration tests check migration round trips and
+metadata alignment. Stop services while retaining volumes with:
 
+```sh
+docker compose --profile demo down
+```
 
-## Demo UX (Milestone 9)
+## Errors, logs and troubleshooting
 
-Run `make demo`, then open http://localhost:3000. This starts the optional signer, preserves
-keys and existing credentials, and seeds four fictional receivables through normal API
-workflows. No manual database edits are needed. Run `make seed-fixtures` to resume fixture
-setup without resetting advanced records; `make seed` still creates identities only.
+Every API error has `error.code`, `message`, `details`, `requestId`, and an `X-Request-ID`
+header. Validation responses never echo raw inputs. Unexpected failures return a generic
+500. Logs use JSON with server-generated request IDs, route templates, status and duration,
+plus authenticated user/org and asset/transaction/event references when known. They exclude
+JWTs, passwords, signatures, request bodies, document contents and raw exception/SQL text.
+Ledger references in completion logs describe the attempted request; persisted audit/ledger
+records establish committed business outcomes. Uvicorn raw access logging is disabled in
+the documented API commands so query parameters are not logged.
 
-- **Registry checker**: invoice metadata → sanitized duplicate/eligibility result.
-- **Settlement simulator**: settlement-role only; valid signature, invalid signature and
-  exact event replay. Private signing keys stay in the separate local signer service.
-- **Audit & security**: admin-only activity and webhook rejection feeds.
-- **Receivable journey**: recorded lifecycle steps through REALIZED, EBRC_ELIGIBLE and CLOSED.
+- Docker paused/unavailable: resume Docker Desktop, then rerun the command.
+- Login fails after changing DEMO_PASSWORD: existing passwords are intentionally preserved.
+- Signature verification/signing fails: check `make keys`, trusted public registry and signer
+  configuration; never replace existing private keys merely to clear an error.
+- Port in use: stop the conflicting service or configure the documented port overrides.
+- Unknown ledger result: restore availability and repeat the exact action/event. Do not
+  create a replacement operation. Simulator replay uses the last event in the open page.
+- Readiness: `/api/v1/health` is liveness; `/api/v1/health/ready` performs a real database query.
+  Database readiness does not prove gateway connectivity.
 
-Follow [all three demo scenarios](docs/demo-script.md). See the
-[Milestone 9 report](docs/milestone-9.md) for changed files and verification.
-`make test-e2e` starts isolated API/web/signer servers on ports 8001/3001/8091.
-Live Drunix deployment is still unverified; the demo uses explicitly configured mock mode.
+## Boundaries and documentation
+
+TradeCred is a prototype, not production-ready or regulator-approved. It does not replace
+TReDS, prevent off-network fraud, move FX, issue e-BRC certificates, or make token state a
+legal assignment. AD banks/remittance providers remain regulated intermediaries. e-BRC
+eligibility is SELF_CERTIFICATION_PENDING, not issuance. Real bank/TReDS/DGFT/RBI/NPCI
+production integrations, HSM custody and live-network certification remain outside scope.
+Login rate limiting, password recovery and token revocation remain production hardening work.
+
+[Architecture](docs/architecture.md) · [API](docs/api.md) · [Demo](docs/demo-script.md) ·
+[Threat model](docs/threat-model.md) · [Regulatory boundaries](docs/regulatory-boundaries.md) ·
+[Milestone 10 report](docs/milestone-10.md)

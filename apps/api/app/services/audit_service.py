@@ -3,6 +3,7 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.logging import bind
 from app.models.ledger import AuditEvent
 
 SAFE_FIELDS = {
@@ -33,6 +34,15 @@ def record_audit(
 ) -> None:
     if metadata and not metadata.keys() <= SAFE_FIELDS:
         raise ValueError("Unsupported audit metadata field.")
+    # Enrich the completion log; SQL audit rows remain the committed source of truth.
+    bind(user_id=str(actor_user_id), org_id=actor_org_id)
+    if asset_id:
+        bind(asset_id=asset_id)
+    values = metadata or {}
+    if values.get("transactionId"):
+        bind(transaction_id=values["transactionId"])
+    if values.get("eventId"):
+        bind(event_id=values["eventId"])
     session.add(
         AuditEvent(
             event_type=event_type,

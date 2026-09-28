@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings
 from app.core.errors import APIError
+from app.core.logging import bind
 from app.integrations.ledger.base import LedgerActor
 from app.integrations.ledger.drunix import DrunixLedgerClient
 from app.integrations.ledger.factory import create_ledger_client
@@ -132,6 +133,12 @@ class SettlementService:
         if user is None:
             raise APIError(403, "UNTRUSTED_BANK", "No active settlement identity for this bank.")
         actor = LedgerActor(user_id=user.id, organization_id=user.organization_id, role=user.role)
+        bind(
+            user_id=str(user.id),
+            org_id=user.organization_id,
+            asset_id=payload.assetId,
+            event_id=payload.eventId,
+        )
         # Global event and nonce locks also serialize replays targeting different assets.
         for key in sorted(("event:" + payload.eventId, "nonce:" + payload.nonce)):
             lock_id = int.from_bytes(hashlib.sha256(key.encode()).digest()[:8], "big", signed=True)
