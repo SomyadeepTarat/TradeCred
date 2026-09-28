@@ -29,7 +29,9 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: "1.26.8"
-          cache-dependency-path: blockchain/chaincode/tradecred/go.sum
+          cache-dependency-path: |
+            blockchain/chaincode/tradecred/go.sum
+            services/drunix-gateway/go.sum
       - uses: astral-sh/setup-uv@v6
         with:
           version: "0.7.22"
@@ -37,7 +39,7 @@ jobs:
       - run: make install
       - run: make test
       - run: make lint
-      - run: make build-chaincode
+      - run: make build-chaincode build-gateway
       - run: make migrate
       - run: make seed
       - run: make test-integration

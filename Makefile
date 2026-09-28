@@ -18,7 +18,7 @@ api:
 web:
 	$(WEB) run dev
 
-test: test-api test-web test-chaincode
+test: test-api test-web test-chaincode test-gateway
 
 test-api:
 	$(API) pytest -m "not integration"
@@ -29,7 +29,7 @@ test-web:
 test-integration:
 	$(API) pytest -m integration
 
-lint: lint-chaincode
+lint: lint-chaincode lint-gateway
 	$(API) ruff check . ../../scripts/seed_demo.py ../../scripts/test_ui.py ../../scripts/generate_keys.py ../../services/bank-simulator
 	$(API) ruff format --check . ../../scripts/seed_demo.py ../../scripts/test_ui.py ../../scripts/generate_keys.py ../../services/bank-simulator
 	$(API) mypy app
@@ -37,7 +37,7 @@ lint: lint-chaincode
 	$(WEB) run typecheck
 	$(WEB) run format:check
 
-format: format-chaincode
+format: format-chaincode format-gateway
 	$(API) ruff format . ../../scripts/seed_demo.py ../../scripts/test_ui.py ../../scripts/generate_keys.py ../../services/bank-simulator
 	$(API) ruff check --fix . ../../scripts/seed_demo.py ../../scripts/test_ui.py ../../scripts/generate_keys.py ../../services/bank-simulator
 	$(API) ruff format . ../../scripts/seed_demo.py ../../scripts/test_ui.py ../../scripts/generate_keys.py ../../services/bank-simulator
@@ -53,7 +53,7 @@ seed:
 	uv run --frozen --project apps/api python scripts/seed_demo.py
 
 demo reset:
-	@echo "$@ is not available in Milestone 7; see README.md for milestone scope."
+	@echo "$@ is not available in Milestone 8; see README.md for milestone scope."
 	@exit 2
 
 test-e2e: build
@@ -78,3 +78,23 @@ format-chaincode:
 
 build-chaincode:
 	bash scripts/chaincode.sh go build -mod=readonly -o build/tradecred .
+
+
+.PHONY: test-gateway lint-gateway format-gateway build-gateway drunix-preflight drunix-package
+test-gateway:
+	bash scripts/gateway.sh go test -mod=readonly -race -cover ./...
+
+lint-gateway:
+	bash scripts/gateway.sh sh -c 'test -z "$$(gofmt -l .)" && go vet -mod=readonly ./...'
+
+format-gateway:
+	bash scripts/gateway.sh gofmt -w .
+
+build-gateway:
+	bash scripts/gateway.sh go build -mod=readonly -o build/gateway .
+
+drunix-preflight:
+	bash blockchain/network/scripts/preflight.sh
+
+drunix-package:
+	bash blockchain/network/scripts/package.sh

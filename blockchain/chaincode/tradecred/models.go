@@ -6,6 +6,7 @@ type TradeCredContract struct{ contractapi.Contract }
 
 // No exact amount, buyer, invoice number, reference or commercial terms enter world state.
 type Asset struct {
+	ActorOrgID                string `json:"actorOrgId"`
 	AssetID                   string `json:"assetId"`
 	InvoiceFingerprint        string `json:"invoiceFingerprint"`
 	DocumentHash              string `json:"documentHash"`

@@ -12,7 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings
 from app.core.errors import APIError
-from app.integrations.ledger.base import LedgerActor, LedgerAsset, LedgerClient
+from app.integrations.ledger.base import LedgerActor, LedgerClient
+from app.integrations.ledger.drunix import DrunixLedgerClient
 from app.integrations.ledger.factory import create_ledger_client
 from app.integrations.payments.base import PaymentAdapter
 from app.integrations.payments.mock_npci import MockNPCIPaymentAdapter
@@ -29,6 +30,7 @@ from app.schemas.financing import (
 from app.services.agreement_service import agreement_hash, agreement_payload, canonical_agreement
 from app.services.audit_service import record_audit
 from app.services.fingerprint_service import amount_to_minor
+from app.services.ledger_mode import require_ledger_mode
 from app.services.receivable_access import financier_scope
 
 
@@ -107,6 +109,7 @@ class FinancingService:
         row = await self.session.scalar(query)
         if row is None:
             raise APIError(404, "RECEIVABLE_NOT_FOUND", "Receivable not found.")
+        require_ledger_mode(row, self.settings)
         self.audit_target = (row.id, row.asset_id)
         return row
 
@@ -122,12 +125,17 @@ class FinancingService:
             metadata=metadata,
         )
 
-    async def _asset(self, ledger: LedgerClient, row: Receivable) -> LedgerAsset:
+    async def _asset(
+        self, ledger: LedgerClient, row: Receivable, recovery_key: str | None = None
+    ) -> bool:
         if not row.asset_id or not row.invoice_fingerprint:
             raise APIError(
                 409, "ASSET_NOT_REGISTERED", "Register and open the receivable before financing."
             )
         asset = await ledger.find_by_fingerprint(row.invoice_fingerprint)
+        if asset is not None and isinstance(ledger, DrunixLedgerClient) and recovery_key:
+            if await ledger.recovery_matches(recovery_key, asset):
+                return True
         if asset is None or (
             asset.asset_id,
             asset.exporter_org_id,
@@ -148,7 +156,7 @@ class FinancingService:
                 "LEDGER_STATE_MISMATCH",
                 "Ledger and application state do not agree; financing is unavailable.",
             )
-        return asset
+        return False
 
     def _open(self, row: Receivable) -> None:
         if row.status != S.FINANCE_AVAILABLE:
@@ -343,13 +351,14 @@ class FinancingService:
         async with self._transaction():
             row, offer = await self._offer_row(offer_id)
             ledger = self._ledger()
-            await self._asset(ledger, row)
+            recovering = await self._asset(ledger, row, "lock:" + str(offer.id))
             existing = await self.session.scalar(
                 select(FinancingAgreement).where(FinancingAgreement.receivable_id == row.id)
             )
             if existing and existing.offer_id == offer.id:
                 self._verify_agreement(row, offer, existing)
                 result = FinancingResult(
+                    backend=self.settings.ledger_backend,
                     receivable_id=row.id,
                     status=row.status,
                     offer_id=offer.id,
@@ -360,17 +369,30 @@ class FinancingService:
             else:
                 self._open(row)
                 offers = await self._offers(row)
-                self._expire(row, offers)
-                if offer.status == "EXPIRED":
+                if not recovering:
+                    self._expire(row, offers)
+                if offer.status == "EXPIRED" and not recovering:
                     expired = True
-                elif offer.status != "OFFERED":
+                elif offer.status != "OFFERED" and not recovering:
                     raise APIError(409, "OFFER_NOT_AVAILABLE", "Offer is no longer available.")
                 else:
                     accepted_at = datetime.now(UTC)
                     payload = self._payload(row, offer, accepted_at)
+                    if isinstance(ledger, DrunixLedgerClient):
+                        payload = await ledger.acceptance_payload(
+                            offer.id, payload, offer.expires_at
+                        )
+                        accepted_at = datetime.fromisoformat(
+                            str(payload["acceptedAt"]).replace("Z", "+00:00")
+                        )
                     digest = agreement_hash(payload)
                     receipt = await ledger.lock_receivable(
-                        row.asset_id or "", offer.financier_org_id, digest
+                        row.asset_id or "",
+                        offer.financier_org_id,
+                        digest,
+                        payload=payload,
+                        offer_id=offer.id,
+                        expires_at=offer.expires_at,
                     )
                     agreement = FinancingAgreement(
                         receivable_id=row.id,
@@ -402,10 +424,11 @@ class FinancingService:
                         row,
                         fromStatus="FINANCE_AVAILABLE",
                         toStatus="LOCKED",
-                        backend="mock",
+                        backend=self.settings.ledger_backend,
                         transactionId=receipt.transaction_id,
                     )
                     result = FinancingResult(
+                        backend=self.settings.ledger_backend,
                         receivable_id=row.id,
                         status=row.status,
                         offer_id=offer.id,
@@ -422,6 +445,8 @@ class FinancingService:
         self._role(Role.EXPORTER)
         async with self._transaction():
             row, offer = await self._offer_row(offer_id)
+            if self.settings.ledger_backend == "drunix":
+                await self._asset(self._ledger(), row)
             self._expire(row, await self._offers(row))
             if offer.status == "ACCEPTED":
                 raise APIError(
@@ -446,7 +471,7 @@ class FinancingService:
                     "Only the financing lock owner may simulate disbursement.",
                 )
             ledger = self._ledger()
-            await self._asset(ledger, row)
+            await self._asset(ledger, row, "transition:" + (row.asset_id or "") + ":FINANCED")
             agreement = await self.session.scalar(
                 select(FinancingAgreement).where(FinancingAgreement.receivable_id == row.id)
             )
@@ -467,6 +492,7 @@ class FinancingService:
                         "The recorded payment simulation is inconsistent.",
                     )
                 result = FinancingResult(
+                    backend=self.settings.ledger_backend,
                     receivable_id=row.id,
                     status=row.status,
                     offer_id=offer.id,
@@ -497,10 +523,11 @@ class FinancingService:
                     row,
                     fromStatus="LOCKED",
                     toStatus="FINANCED",
-                    backend="mock",
+                    backend=self.settings.ledger_backend,
                     transactionId=receipt.transaction_id,
                 )
                 result = FinancingResult(
+                    backend=self.settings.ledger_backend,
                     receivable_id=row.id,
                     status=row.status,
                     offer_id=offer.id,

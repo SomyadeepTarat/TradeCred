@@ -8,6 +8,7 @@ from starlette.concurrency import run_in_threadpool
 from app.core.config import Settings
 from app.core.errors import APIError
 from app.integrations.ledger.base import LedgerActor, LedgerReceipt, Registration
+from app.integrations.ledger.drunix import DrunixLedgerClient
 from app.integrations.ledger.factory import create_ledger_client
 from app.integrations.storage.base import DocumentTooLargeError
 from app.integrations.storage.local import LocalDocumentStorage
@@ -17,6 +18,7 @@ from app.models.ledger import AuditEvent
 from app.schemas.ledger import AuditResponse, HistoryResponse, LifecycleResponse, RegistryResponse
 from app.services.audit_service import record_audit
 from app.services.fingerprint_service import canonical_invoice, document_hash, invoice_fingerprint
+from app.services.ledger_mode import bind_ledger, require_ledger_mode
 from app.services.receivable_access import financier_scope
 from app.services.state_machine import require_transition
 
@@ -63,6 +65,7 @@ class LedgerService:
             )
         ):
             raise APIError(404, "RECEIVABLE_NOT_FOUND", "Receivable not found.")
+        require_ledger_mode(row, self.settings)
         return row
 
     async def _verify_integrity(self, row: Receivable) -> None:
@@ -114,7 +117,10 @@ class LedgerService:
         except APIError as exc:
             await self.session.rollback()
             if exc.code == "DUPLICATE_RECEIVABLE":
-                self._audit("DUPLICATE_REJECTED", metadata={"reason": exc.code, "backend": "mock"})
+                self._audit(
+                    "DUPLICATE_REJECTED",
+                    metadata={"reason": exc.code, "backend": self.settings.ledger_backend},
+                )
                 try:
                     await self.session.commit()
                 except SQLAlchemyError as audit_error:
@@ -137,12 +143,30 @@ class LedgerService:
         row = await self._load(receivable_id, lock=True)
         receipt: LedgerReceipt | None = None
         previous = row.status
-        retry = target == Status.REGISTERED and row.asset_id is not None
+        retry = (
+            target == Status.REGISTERED
+            and row.asset_id is not None
+            and row.status != Status.VERIFIED
+        )
         if not retry:
             require_transition(previous, target)
         if target in {Status.SUBMITTED, Status.VERIFIED, Status.REGISTERED} and not retry:
             await self._verify_integrity(row)
-        if target == Status.REGISTERED:
+        if target == Status.VERIFIED and self.settings.ledger_backend == "drunix":
+            ledger = create_ledger_client(self.session, self.settings, self.actor)
+            assert isinstance(ledger, DrunixLedgerClient)
+            receipt = await ledger.verify_receivable(
+                Registration(
+                    asset_id="TC-" + row.id.hex,
+                    invoice_fingerprint=row.invoice_fingerprint or "",
+                    document_hash=row.document_hash or "",
+                    exporter_org_id=row.exporter_org_id,
+                    currency=row.currency,
+                    face_value_minor=row.face_value_minor,
+                    due_date=row.due_date,
+                )
+            )
+        elif target == Status.REGISTERED:
             if not row.document_hash or not row.invoice_fingerprint:
                 raise APIError(409, "DOCUMENT_REQUIRED", "Invoice hashes are missing.")
             ledger = create_ledger_client(self.session, self.settings, self.actor)
@@ -166,15 +190,18 @@ class LedgerService:
             raise APIError(
                 409, "INVALID_STATE_TRANSITION", "This workflow is not exposed in this milestone."
             )
+        if target == Status.VERIFIED:
+            bind_ledger(row, self.settings)
         row.status = receipt.asset.status if receipt else target
         if receipt:
+            bind_ledger(row, self.settings)
             row.asset_id = receipt.asset.asset_id
             row.owner_org_id = receipt.asset.owner_org_id
             row.financing_agreement_hash = receipt.asset.agreement_hash
         if receipt is None or not receipt.replayed:
             metadata = {"fromStatus": previous.value, "toStatus": row.status.value}
             if receipt:
-                metadata.update(backend="mock", transactionId=receipt.transaction_id)
+                metadata.update(backend=receipt.asset.backend, transactionId=receipt.transaction_id)
             event = {
                 Status.SUBMITTED: "RECEIVABLE_SUBMITTED",
                 Status.VERIFIED: "RECEIVABLE_VERIFIED",
@@ -187,7 +214,7 @@ class LedgerService:
             status=row.status,
             asset_id=row.asset_id,
             transaction_id=receipt.transaction_id if receipt else None,
-            backend="mock" if receipt else None,
+            backend=receipt.asset.backend if receipt else None,
             replayed=receipt.replayed if receipt else False,
         )
         await self.session.commit()
@@ -198,7 +225,10 @@ class LedgerService:
             ledger = create_ledger_client(self.session, self.settings, self.actor)
             asset = await ledger.find_by_fingerprint(fingerprint)
             result = RegistryResponse(
-                fingerprint=fingerprint, exists=asset is not None, eligible=asset is None
+                fingerprint=fingerprint,
+                exists=asset is not None,
+                eligible=asset is None,
+                backend=self.settings.ledger_backend,
             )
             if asset:
                 result.asset_id, result.status = asset.asset_id, asset.status
@@ -227,7 +257,7 @@ class LedgerService:
                 metadata={
                     "fingerprint": fingerprint,
                     "status": asset.status if asset else "ABSENT",
-                    "backend": "mock",
+                    "backend": self.settings.ledger_backend,
                 },
             )
             await self.session.commit()
@@ -246,6 +276,7 @@ class LedgerService:
                 )
                 if row is None:
                     raise APIError(404, "RECEIVABLE_NOT_FOUND", "Receivable not found.")
+                require_ledger_mode(row, self.settings)
                 ledger = create_ledger_client(self.session, self.settings, self.actor)
                 return HistoryResponse(
                     events=[], ledger=await ledger.get_history(row.asset_id or "")

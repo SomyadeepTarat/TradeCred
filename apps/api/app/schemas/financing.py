@@ -64,4 +64,4 @@ class FinancingResult(BaseModel):
     transaction_id: str
     payment: PaymentReceipt | None = None
     replayed: bool = False
-    backend: Literal["mock"] = "mock"
+    backend: Literal["mock", "drunix"] = "mock"

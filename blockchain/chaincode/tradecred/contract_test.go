@@ -666,3 +666,43 @@ func TestCollectionPoliciesMatchParticipantPairs(t *testing.T) {
 		}
 	}
 }
+
+func TestDurableOperationRecoveryAndActorBinding(t *testing.T) {
+	h := newHarness(t)
+	h.available()
+	h.terms("ORG_BANK_CITI_DEMO")
+	op := strings.Repeat("9", 64)
+	args := string(marshal([]string{"TC-001", "ORG_BANK_CITI_DEMO", digest(h.agreement)}))
+	h.stub.tx = "committed-lock"
+	first, err := h.contract.Execute(h.ctx, op, "LockReceivable", args)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.Replayed {
+		t.Fatal("first operation marked replay")
+	}
+	h.stub.tx = "retry-tx"
+	second, err := h.contract.Execute(h.ctx, op, "LockReceivable", args)
+	if err != nil || !second.Replayed || second.Asset.TransactionID != "committed-lock" {
+		t.Fatal(second, err)
+	}
+	if second.Asset.Revision != 4 {
+		t.Fatal("duplicate transition")
+	}
+	h.stub.transient["agreement"] = []byte("{}")
+	if _, err := h.contract.Execute(h.ctx, op, "LockReceivable", args); err == nil {
+		t.Fatal("changed payload accepted")
+	}
+	h.as("ORG_BANK_NBFC_DEMO")
+	if _, err := h.contract.GetOperationReceipt(h.ctx, op); err == nil {
+		t.Fatal("foreign receipt disclosed")
+	}
+	h.as("ORG_EXPORTER_ALPHA")
+	receipt, err := h.contract.GetOperationReceipt(h.ctx, op)
+	if err != nil || receipt.Asset.TransactionID != "committed-lock" {
+		t.Fatal(receipt, err)
+	}
+	if _, err := h.contract.Execute(h.ctx, strings.Repeat("8", 64), "DeleteAsset", "[]"); err == nil {
+		t.Fatal("unknown method exposed")
+	}
+}

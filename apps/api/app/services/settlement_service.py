@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import Settings
 from app.core.errors import APIError
 from app.integrations.ledger.base import LedgerActor
+from app.integrations.ledger.drunix import DrunixLedgerClient
 from app.integrations.ledger.factory import create_ledger_client
 from app.models.domain import (
     Organization,
@@ -24,6 +25,7 @@ from app.models.settlement import PaymentEvent, SecurityEvent
 from app.schemas.settlement import PaymentEventInput, PaymentEventView
 from app.security.signatures import verify_signature
 from app.services.audit_service import record_audit
+from app.services.ledger_mode import require_ledger_mode
 
 
 def unique_fields(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
@@ -41,6 +43,7 @@ def event_view(event: PaymentEvent) -> PaymentEventView:
         asset_id=event.asset_id,
         transaction_id=event.transaction_id,
         received_at=event.received_at,
+        backend=event.backend,
     )
 
 
@@ -153,6 +156,7 @@ class SettlementService:
         )
         if row is None:
             raise APIError(404, "ASSET_NOT_FOUND", "Receivable not found.")
+        require_ledger_mode(row, self.settings)
         if row.status != ReceivableStatus.FINANCED:
             raise APIError(
                 409, "INVALID_STATE_TRANSITION", "Only financed receivables accept settlement."
@@ -165,13 +169,21 @@ class SettlementService:
             )
         ledger = create_ledger_client(self.session, self.settings, actor)
         asset = await ledger.get_receivable(payload.assetId)
-        if asset is None or (
-            asset.status != row.status
-            or asset.owner_org_id != row.owner_org_id
-            or asset.agreement_hash != row.financing_agreement_hash
-            or asset.invoice_fingerprint != row.invoice_fingerprint
-            or asset.exporter_org_id != row.exporter_org_id
-            or asset.currency != row.currency
+        recovering = (
+            asset is not None
+            and isinstance(ledger, DrunixLedgerClient)
+            and await ledger.recovery_matches("payment:" + payload.eventId, asset)
+        )
+        if not recovering and (
+            asset is None
+            or (
+                asset.status != row.status
+                or asset.owner_org_id != row.owner_org_id
+                or asset.agreement_hash != row.financing_agreement_hash
+                or asset.invoice_fingerprint != row.invoice_fingerprint
+                or asset.exporter_org_id != row.exporter_org_id
+                or asset.currency != row.currency
+            )
         ):
             raise APIError(503, "LEDGER_UNAVAILABLE", "Ledger projection is inconsistent.")
         receipt = await ledger.confirm_payment(
@@ -192,6 +204,7 @@ class SettlementService:
             payload_hash=digest,
             key_id=key_id,
             transaction_id=receipt.transaction_id,
+            backend=receipt.asset.backend,
             received_at=datetime.now(UTC),
         )
         self.session.add(event)
@@ -207,7 +220,7 @@ class SettlementService:
                 metadata={
                     "eventId": payload.eventId,
                     "transactionId": receipt.transaction_id,
-                    "backend": "mock",
+                    "backend": receipt.asset.backend,
                 },
             )
         await self.session.flush()

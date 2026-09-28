@@ -143,7 +143,12 @@ class ReceivableQueries:
             role_allowed = (
                 self.user.role == Role.ADMIN
                 if action == "verify"
-                else self.user.role in {Role.EXPORTER, Role.ADMIN}
+                else self.user.role
+                in (
+                    {Role.EXPORTER}
+                    if self.settings.ledger_backend == "drunix"
+                    else {Role.EXPORTER, Role.ADMIN}
+                )
                 if action == "register"
                 else self.user.role == Role.EXPORTER
             )
@@ -153,5 +158,5 @@ class ReceivableQueries:
             **self._view(row).model_dump(),
             document_available=document_id is not None and self.user.role == Role.EXPORTER,
             available_actions=actions,
-            ledger_backend=self.settings.ledger_backend,
+            ledger_backend=row.ledger_backend or self.settings.ledger_backend,
         )

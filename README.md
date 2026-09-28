@@ -116,9 +116,9 @@ localhost. Both API and web containers run without root. Health endpoints:
   PDF before submission, verification and registration. Legacy drafts without PDFs cannot advance.
 - `LEDGER_BACKEND=mock` uses PostgreSQL-backed MockLedgerClient. Responses identify
   `backend: mock` and transaction IDs start with `MOCK-`. This is a simulation.
-- `LEDGER_BACKEND=drunix` reserves the future gateway configuration. Go chaincode is implemented in
-  Milestone 7; the gateway remains Milestone 8. Ledger-dependent calls return 503 now;
-  there is no silent fallback.
+- `LEDGER_BACKEND=drunix` selects the authenticated Fabric Gateway bridge. Missing configuration,
+  connection failures or unconfirmed commits fail closed with 503; there is no silent fallback.
+  Live Drunix compatibility is unverified. See [network setup](blockchain/network/README.md).
 - `make demo` and `make reset` deliberately exit nonzero until
   their real implementations arrive. Payments remain explicit simulations; settlement consumes signed bank events.
 - Authentication has no registration, password-reset, refresh-token, or logout-revocation
@@ -317,3 +317,16 @@ financing ownership, private commercial data and payment event uniqueness. See t
 [contract guide](blockchain/chaincode/tradecred/README.md) for functions, transient payloads,
 MSP attributes, collection policies and deployment prerequisites. Contract tests pass locally;
 no Drunix network is deployed, and the application continues to use explicit mock ledger mode.
+
+
+## Drunix gateway (Milestone 8)
+
+The API can select `DrunixLedgerClient` using `LEDGER_BACKEND=drunix`, or explicitly use
+`MockLedgerClient` with `LEDGER_BACKEND=mock`. Existing verified assets remain bound to
+their original backend and network. Changing the environment does not migrate assets.
+
+See [setup and deployment](blockchain/network/README.md) and the
+[Milestone 8 report](docs/milestone-8.md) for configuration, recovery, validation and limitations.
+Run `make migrate`, `make test`, `make test-integration`, `make lint`, and `make test-e2e`.
+`make build-gateway` builds the bridge; `docker compose --profile drunix build drunix-gateway`
+builds its optional container. The default stack remains explicitly mock.

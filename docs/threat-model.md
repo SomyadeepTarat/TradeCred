@@ -85,9 +85,18 @@ Sensitive payloads travel through transient data, never ordinary arguments. Salt
 amount commitments resist guessing; exporter-private storage and four distinct pair
 collections prevent losing banks from being collection members. Public state/history/events
 stay sanitized. Salts must be generated securely off-chain. Proposal recipients see transient
-plaintext, so a future gateway must restrict endorsers to authorized participants.
+plaintext, so the gateway explicitly selects actor or exporter/winning-financier endorsers.
 
 Tests verify contract logic and rollback semantics in an explicit in-memory harness. They
 do not validate live endorsement, gossip, MVCC, CA provisioning or Drunix compatibility.
-Those require Milestone 8 integration. A compromised trusted verifier/settlement backend,
+Those still require validation on a provisioned network. A compromised trusted verifier/settlement backend,
 misissued certificate attributes or incorrect network endorsement policies remain risks.
+
+## Gateway trust boundary (Milestone 8)
+
+The internal relay bearer token grants access to mapped signing identities and must remain
+private. Peer TLS validates root and hostname. Remote relay HTTP is rejected by API
+configuration. SDK errors are reduced to allowlisted codes; no fallback manufactures
+success. Private journal inputs survive rollback and require restricted database access,
+backups and retention. This journal is application-private storage, not a blockchain PDC.
+No live-network privacy or commit guarantees have been validated locally.

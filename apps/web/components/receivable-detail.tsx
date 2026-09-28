@@ -164,12 +164,12 @@ export function ReceivableDetail({ id }: { id: string }) {
             <strong>
               {row.ledger_backend === "mock"
                 ? "Mock ledger · Local simulation"
-                : "Drunix selected · Gateway unavailable"}
+                : "Drunix · Configured gateway"}
             </strong>
             <span>
               {row.ledger_backend === "mock"
                 ? "Recorded transactions use MOCK- identifiers."
-                : "Ledger operations will return an error until the gateway is implemented."}
+                : "Ledger writes require confirmed commits. Availability is checked per request."}
             </span>
           </div>
           <section className="action-panel">

@@ -23,9 +23,9 @@ consortium administration organization. Five users cover all four roles, includi
 PostgreSQL persists in a named volume. API/web containers run without root and published
 ports are loopback-only. JWT secrets come from configuration, never generated per worker.
 
-Milestone 3 adds LedgerClient and a PostgreSQL-backed MockLedgerClient. DrunixLedgerClient
-remains future work; Go private-collection logic/configuration is now supplied in Milestone 7. Signed bank event ingestion is now implemented.
-Selecting Drunix returns 503 for ledger operations, without a mock fallback.
+Milestone 3 adds LedgerClient and a PostgreSQL-backed MockLedgerClient. Milestone 8 adds DrunixLedgerClient and an authenticated official Fabric Gateway SDK bridge.
+Signed bank event ingestion is implemented. Drunix requires configured identities and a
+compatible provisioned network; unavailable or unconfirmed operations return 503 without fallback.
 
 
 Milestone 2 adds multipart upload -> canonical identity / PDF validation -> DRAFT and
@@ -140,7 +140,16 @@ plaintext values. History/events contain sanitized asset state only.
 All timestamps come from proposals, all value arithmetic uses integers, and all endorsers
 use the same checked-in participant/collection profile. Tests check parity with Python's
 state matrix and currency units. Endorsement, actual MSP enrollment and Fabric MVCC commit
-behavior need real-network verification in Milestone 8. Existing application routes still
-use MockLedgerClient; no Go gateway or automatic realization/closure has been added.
+behavior still need real-network verification. Application routes select their ledger by
+environment; automatic realization/closure has not been added.
 
 See [contract interface and deployment requirements](../blockchain/chaincode/tradecred/README.md).
+
+## Gateway durability (Milestone 8)
+
+The Go sidecar waits for VALID commit through the official SDK. `Execute` atomically
+stores a request hash and sanitized receipt with the chaincode mutation. PostgreSQL
+`ledger_artifacts` separately commits stable private inputs before submission so retries
+survive local projection rollback. Exact receipt/current-state matching permits recovery;
+changed requests fail. Existing assets bind to backend/network and cannot silently move
+between mock and Drunix. See [network guide](../blockchain/network/README.md).

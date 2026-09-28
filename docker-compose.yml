@@ -24,6 +24,11 @@ services:
       DOCUMENT_STORAGE_PATH: /data/documents
       MAX_UPLOAD_BYTES: ${MAX_UPLOAD_BYTES:-10485760}
       LEDGER_BACKEND: ${LEDGER_BACKEND:-mock}
+      DRUNIX_GATEWAY_URL: ${DRUNIX_DOCKER_GATEWAY_URL:-http://drunix-gateway:8080}
+      DRUNIX_GATEWAY_TOKEN: ${DRUNIX_GATEWAY_TOKEN:-}
+      DRUNIX_NETWORK_ID: ${DRUNIX_NETWORK_ID:-}
+      DRUNIX_CHANNEL: ${DRUNIX_CHANNEL:-}
+      DRUNIX_CHAINCODE_NAME: ${DRUNIX_CHAINCODE_NAME:-tradecred}
       BANK_TRUSTED_KEYS: '{"demo-bank-1":{"bank_id":"BANK_SETTLEMENT_01","organization_id":"ORG_SETTLEMENT_BANK","public_key_path":"/bank-public/bank-public.pem"}}'
       PAYMENT_TIMESTAMP_TOLERANCE_SECONDS: ${PAYMENT_TIMESTAMP_TOLERANCE_SECONDS:-300}
     volumes:
@@ -54,6 +59,18 @@ services:
       interval: 10s
       timeout: 5s
       retries: 6
+  drunix-gateway:
+    profiles: ["drunix"]
+    build: ./services/drunix-gateway
+    environment:
+      DRUNIX_GATEWAY_TOKEN: ${DRUNIX_GATEWAY_TOKEN:-}
+      DRUNIX_GATEWAY_CONFIG: /config/gateway.json
+      DRUNIX_LISTEN: 0.0.0.0:8080
+    volumes:
+      - ./data/drunix/config:/config:ro
+      - ./data/drunix/identities:/identities:ro
+    ports:
+      - "127.0.0.1:8080:8080"
 volumes:
   postgres_data:
   document_data:

@@ -42,7 +42,7 @@ Codes: `AUTHENTICATION_REQUIRED` (401), `INVALID_TOKEN` (401),
 `INVALID_CREDENTIALS` (401), `UNAUTHORIZED_ROLE` (403). Authentication errors include
 `WWW-Authenticate: Bearer`. Request validation retains FastAPI's 422 format for now.
 
-The mock lifecycle, registry, financing and signed settlement endpoints below are available; no endpoint reports a live Drunix transaction or payment.
+The mock lifecycle, registry, financing and signed settlement endpoints below are available; ledger responses identify the configured backend. Live Drunix operation requires a provisioned network; payment disbursement remains simulated.
 
 ## Invoice documents
 
@@ -195,7 +195,7 @@ lock transaction and current asset status, without rewinding state.
 Disbursement returns `payment.status: SIMULATED_SUCCEEDED`, `backend: mock`, a MOCKPAY-
 transaction ID and a MOCK- ledger reference. Simulation, ledger transition, projection and
 audit share one transaction. Failure reports no success; retries reconcile a lost response.
-This does not confirm buyer settlement. Drunix mode returns 503 without fallback.
+This does not confirm buyer settlement. Drunix mode records financing through the configured gateway; unknown commits return 503 without fallback.
 
 Financier GET `/receivables` supports `view=available|offers|assigned|all`; pagination and
 status filtering remain available. Only open assets, assigned assets or assets with that
@@ -244,3 +244,13 @@ remittance reference. The Next.js gateway does not proxy the signed webhook. The
 simulator runs outside the browser with its private key.
 
 See [simulator commands](../services/bank-simulator/README.md).
+
+## Gateway failures (Milestone 8)
+
+Ledger responses use `backend: mock` or `backend: drunix`; mock payment receipts remain
+`backend: mock` in both modes. `LEDGER_UNAVAILABLE` (503) includes unknown remote outcomes.
+Retry the same action after recovery; do not create replacement offers/events. Exact
+operation receipts permit projection repair without a second business transition.
+`LEDGER_BACKEND_MISMATCH` (503) rejects assets from another backend/network.
+`OPERATION_CONFLICT` (409) rejects changed durable inputs. Gateway credentials are
+internal and never accepted from public API callers.

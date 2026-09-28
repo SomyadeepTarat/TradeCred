@@ -43,7 +43,7 @@ class RegistryResponse(BaseModel):
     reason: str | None = None
     locked: bool = False
     financed: bool = False
-    backend: Literal["mock"] = "mock"
+    backend: Literal["mock", "drunix"] = "mock"
 
 
 class LifecycleResponse(BaseModel):
@@ -51,7 +51,7 @@ class LifecycleResponse(BaseModel):
     status: ReceivableStatus
     asset_id: str | None
     transaction_id: str | None = None
-    backend: Literal["mock"] | None = None
+    backend: Literal["mock", "drunix"] | None = None
     replayed: bool = False
 
 

@@ -40,7 +40,7 @@ class LedgerAsset(BaseModel):
     agreement_hash: str | None
     status: ReceivableStatus
     updated_at: datetime
-    backend: Literal["mock"] = "mock"
+    backend: Literal["mock", "drunix"] = "mock"
 
 
 class LedgerReceipt(BaseModel):
@@ -58,11 +58,11 @@ class LedgerHistoryEntry(BaseModel):
     to_status: ReceivableStatus
     actor_org_id: str
     created_at: datetime
-    backend: Literal["mock"] = "mock"
+    backend: Literal["mock", "drunix"] = "mock"
 
 
 class LedgerClient(Protocol):
-    """Caller owns commit/rollback. Receipts are confirmed only after the unit of work commits."""
+    """Mock writes share the caller transaction; Drunix commits use durable recovery."""
 
     async def register_receivable(self, registration: Registration) -> LedgerReceipt: ...
     async def get_receivable(self, asset_id: str) -> LedgerAsset | None: ...
@@ -71,7 +71,14 @@ class LedgerClient(Protocol):
         self, asset_id: str, target: ReceivableStatus
     ) -> LedgerReceipt: ...
     async def lock_receivable(
-        self, asset_id: str, financier_org_id: str, agreement_hash: str
+        self,
+        asset_id: str,
+        financier_org_id: str,
+        agreement_hash: str,
+        *,
+        payload: dict[str, str | int] | None = None,
+        offer_id: UUID | None = None,
+        expires_at: datetime | None = None,
     ) -> LedgerReceipt: ...
     async def confirm_payment(
         self, asset_id: str, event_id: str, amount_minor: int, currency: str, reference: str

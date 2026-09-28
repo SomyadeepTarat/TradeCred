@@ -4,7 +4,7 @@ import hashlib
 import re
 from datetime import UTC, datetime
 from decimal import Decimal
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from iso4217 import Currency
 from sqlalchemy import select, text
@@ -195,7 +195,14 @@ class MockLedgerClient:
         return await self._record(asset, previous)
 
     async def lock_receivable(
-        self, asset_id: str, financier_org_id: str, agreement_hash: str
+        self,
+        asset_id: str,
+        financier_org_id: str,
+        agreement_hash: str,
+        *,
+        payload: dict[str, str | int] | None = None,
+        offer_id: UUID | None = None,
+        expires_at: datetime | None = None,
     ) -> LedgerReceipt:
         asset = await self._locked_asset(asset_id)
         self._exporter(asset.exporter_org_id)

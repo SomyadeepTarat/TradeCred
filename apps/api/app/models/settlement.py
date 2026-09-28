@@ -17,7 +17,8 @@ class PaymentEvent(Base):
     payload_hash: Mapped[str] = mapped_column(String(64))
     key_id: Mapped[str] = mapped_column(String(80))
     verification_status: Mapped[str] = mapped_column(String(16), default="VERIFIED")
-    transaction_id: Mapped[str] = mapped_column(String(50))
+    backend: Mapped[str] = mapped_column(String(16), default="mock", server_default="mock")
+    transaction_id: Mapped[str] = mapped_column(String(80))
     received_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

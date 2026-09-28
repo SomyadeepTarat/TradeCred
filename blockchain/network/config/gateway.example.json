@@ -1,0 +1,67 @@
+{
+  "networkId": "replace-with-provisioned-network-id",
+  "channel": "tradecred",
+  "chaincode": "tradecred",
+  "identities": [
+    {
+      "orgId": "ORG_EXPORTER_ALPHA",
+      "role": "EXPORTER",
+      "mspId": "ExporterAlphaMSP",
+      "certificate": "/identities/ExporterAlphaMSP/signcert.pem",
+      "privateKey": "/identities/ExporterAlphaMSP/key.pem",
+      "endpoint": "peer0.exporteralphamsp.example.invalid:7051",
+      "tlsCertificate": "/identities/ExporterAlphaMSP/tls-ca.pem",
+      "tlsServerName": "peer0.exporteralphamsp.example.invalid"
+    },
+    {
+      "orgId": "ORG_EXPORTER_BETA",
+      "role": "EXPORTER",
+      "mspId": "ExporterBetaMSP",
+      "certificate": "/identities/ExporterBetaMSP/signcert.pem",
+      "privateKey": "/identities/ExporterBetaMSP/key.pem",
+      "endpoint": "peer0.exporterbetamsp.example.invalid:7051",
+      "tlsCertificate": "/identities/ExporterBetaMSP/tls-ca.pem",
+      "tlsServerName": "peer0.exporterbetamsp.example.invalid"
+    },
+    {
+      "orgId": "ORG_BANK_CITI_DEMO",
+      "role": "FINANCIER",
+      "mspId": "CitiDemoMSP",
+      "certificate": "/identities/CitiDemoMSP/signcert.pem",
+      "privateKey": "/identities/CitiDemoMSP/key.pem",
+      "endpoint": "peer0.citidemomsp.example.invalid:7051",
+      "tlsCertificate": "/identities/CitiDemoMSP/tls-ca.pem",
+      "tlsServerName": "peer0.citidemomsp.example.invalid"
+    },
+    {
+      "orgId": "ORG_BANK_NBFC_DEMO",
+      "role": "FINANCIER",
+      "mspId": "NbfcDemoMSP",
+      "certificate": "/identities/NbfcDemoMSP/signcert.pem",
+      "privateKey": "/identities/NbfcDemoMSP/key.pem",
+      "endpoint": "peer0.nbfcdemomsp.example.invalid:7051",
+      "tlsCertificate": "/identities/NbfcDemoMSP/tls-ca.pem",
+      "tlsServerName": "peer0.nbfcdemomsp.example.invalid"
+    },
+    {
+      "orgId": "ORG_SETTLEMENT_BANK",
+      "role": "SETTLEMENT_OPERATOR",
+      "mspId": "SettlementBankMSP",
+      "certificate": "/identities/SettlementBankMSP/signcert.pem",
+      "privateKey": "/identities/SettlementBankMSP/key.pem",
+      "endpoint": "peer0.settlementbankmsp.example.invalid:7051",
+      "tlsCertificate": "/identities/SettlementBankMSP/tls-ca.pem",
+      "tlsServerName": "peer0.settlementbankmsp.example.invalid"
+    },
+    {
+      "orgId": "ORG_CONSORTIUM_ADMIN",
+      "role": "ADMIN",
+      "mspId": "ConsortiumAdminMSP",
+      "certificate": "/identities/ConsortiumAdminMSP/signcert.pem",
+      "privateKey": "/identities/ConsortiumAdminMSP/key.pem",
+      "endpoint": "peer0.consortiumadminmsp.example.invalid:7051",
+      "tlsCertificate": "/identities/ConsortiumAdminMSP/tls-ca.pem",
+      "tlsServerName": "peer0.consortiumadminmsp.example.invalid"
+    }
+  ]
+}

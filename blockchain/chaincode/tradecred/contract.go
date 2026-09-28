@@ -38,6 +38,11 @@ func writeAsset(ctx contractapi.TransactionContextInterface, asset *Asset) (*Ass
 	if err != nil {
 		return nil, err
 	}
+	org, _, err := identity(ctx)
+	if err != nil {
+		return nil, err
+	}
+	asset.ActorOrgID = org
 	asset.Revision++
 	asset.UpdatedAt = now.Format(time.RFC3339Nano)
 	asset.TransactionID = ctx.GetStub().GetTxID()

@@ -19,3 +19,6 @@ test-results/
 playwright-report/
 
 /blockchain/chaincode/tradecred/build/
+
+/services/drunix-gateway/build/
+/blockchain/chaincode/tradecred/vendor/

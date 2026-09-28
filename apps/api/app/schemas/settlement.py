@@ -23,4 +23,4 @@ class PaymentEventView(BaseModel):
     status: Literal["PAYMENT_CONFIRMED"] = "PAYMENT_CONFIRMED"
     transaction_id: str
     received_at: datetime
-    backend: Literal["mock"] = "mock"
+    backend: Literal["mock", "drunix"] = "mock"

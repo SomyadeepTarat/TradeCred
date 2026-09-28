@@ -6,6 +6,7 @@ from sqlalchemy import Connection
 from app.core.config import Settings
 from app.core.database import create_database_engine
 from app.models import (
+    drunix,  # noqa: F401
     financing,  # noqa: F401
     ledger,  # noqa: F401
     settlement,  # noqa: F401

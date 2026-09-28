@@ -105,6 +105,8 @@ class Receivable(Timestamps, Base):
     )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    ledger_backend: Mapped[str | None] = mapped_column(String(16))
+    ledger_network: Mapped[str | None] = mapped_column(String(120))
     asset_id: Mapped[str | None] = mapped_column(String(80), unique=True)
     exporter_org_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), index=True)
     buyer_id: Mapped[str] = mapped_column(String(120))
