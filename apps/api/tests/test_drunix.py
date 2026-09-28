@@ -90,6 +90,9 @@ class GatewayDouble:
                     "LockReceivable": "LOCKED",
                     "RecordFinancing": "FINANCED",
                     "ConfirmPayment": "PAYMENT_CONFIRMED",
+                    "MarkRealized": "REALIZED",
+                    "MarkEbrcEligible": "EBRC_ELIGIBLE",
+                    "CloseReceivable": "CLOSED",
                 }[method]
                 if method == "LockReceivable":
                     a["ownerOrgId"], a["agreementHash"] = args[1:]
@@ -197,6 +200,21 @@ def test_gateway_workflow_and_commit_response_recovery(
             assert "amountMinor" not in serialized and "975000" not in serialized
             if request["method"] == "LockReceivable":
                 assert request["endorserOrgs"] == ["ORG_EXPORTER_ALPHA", "ORG_BANK_CITI_DEMO"]
+        gateway.lose_response = "MarkRealized"
+        assert client.post(path + "/realize", headers=admin).status_code == 503
+        for action, state in (
+            ("realize", "REALIZED"),
+            ("ebrc-eligible", "EBRC_ELIGIBLE"),
+            ("close", "CLOSED"),
+        ):
+            advanced = client.post(path + "/" + action, headers=admin)
+            assert advanced.status_code == 200, advanced.text
+            assert advanced.json()["status"] == state
+            assert advanced.json()["backend"] == "drunix"
+        assert gateway.counter == 9
+        assert client.get(path, headers=owner).json()["ebrc_status"] == "SELF_CERTIFICATION_PENDING"
+        audit = client.get(path + "/history", headers=admin).json()["events"]
+        assert sum(e["event_type"] == "RECEIVABLE_REALIZED" for e in audit) == 1
     with Session(database) as session:
         assert session.scalar(select(func.count()).select_from(MockLedgerAsset)) == 0
 

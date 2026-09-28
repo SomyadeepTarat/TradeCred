@@ -84,9 +84,33 @@ export function Workspace({ children }: { children: React.ReactNode }) {
               ＋ <span>Create receivable</span>
             </Link>
           )}
+          <Link
+            href="/receivables/registry"
+            aria-current={path === "/receivables/registry" ? "page" : undefined}
+          >
+            ⌕ <span>Registry checker</span>
+          </Link>
+          {user?.role === "SETTLEMENT_OPERATOR" && (
+            <Link
+              href="/receivables/settlement"
+              aria-current={
+                path === "/receivables/settlement" ? "page" : undefined
+              }
+            >
+              ↗ <span>Settlement simulator</span>
+            </Link>
+          )}
+          {user?.role === "ADMIN" && (
+            <Link
+              href="/receivables/audit"
+              aria-current={path === "/receivables/audit" ? "page" : undefined}
+            >
+              ≡ <span>Audit & security</span>
+            </Link>
+          )}
         </nav>
         <div className="sidebar-bottom">
-          <span className="small-tag">PROTOTYPE · MILESTONE 6</span>
+          <span className="small-tag">PROTOTYPE · SANDBOX</span>
           <p>
             Drunix is the target platform.
             <br />

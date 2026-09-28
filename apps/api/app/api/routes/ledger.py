@@ -1,7 +1,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Path, Query, Request
+from fastapi import APIRouter, Depends, Path, Query, Request, Response
 from sqlalchemy import select
 
 from app.api.dependencies import SessionDependency, SettingsDependency
@@ -80,10 +80,12 @@ async def lookup(
 @router.get("/audit/events", response_model=list[AuditResponse])
 async def audit(
     admin: Annotated[User, Depends(require_roles(Role.ADMIN))],
+    response: Response,
     session: SessionDependency,
     limit: Annotated[int, Query(ge=1, le=500)] = 100,
     offset: Annotated[int, Query(ge=0, le=10000)] = 0,
 ) -> list[AuditResponse]:
+    response.headers["Cache-Control"] = "no-store"
     rows = await session.scalars(
         select(AuditEvent)
         .order_by(AuditEvent.created_at.desc(), AuditEvent.id.desc())
@@ -91,3 +93,18 @@ async def audit(
         .offset(offset)
     )
     return [AuditResponse.model_validate(row) for row in rows]
+
+
+@router.post("/receivables/{receivable_id}/realize", response_model=LifecycleResponse)
+async def realize(receivable_id: UUID, service: Service) -> LifecycleResponse:
+    return await service.advance(receivable_id, Status.REALIZED)
+
+
+@router.post("/receivables/{receivable_id}/ebrc-eligible", response_model=LifecycleResponse)
+async def ebrc(receivable_id: UUID, service: Service) -> LifecycleResponse:
+    return await service.advance(receivable_id, Status.EBRC_ELIGIBLE)
+
+
+@router.post("/receivables/{receivable_id}/close", response_model=LifecycleResponse)
+async def close(receivable_id: UUID, service: Service) -> LifecycleResponse:
+    return await service.advance(receivable_id, Status.CLOSED)

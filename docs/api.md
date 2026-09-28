@@ -254,3 +254,22 @@ operation receipts permit projection repair without a second business transition
 `LEDGER_BACKEND_MISMATCH` (503) rejects assets from another backend/network.
 `OPERATION_CONFLICT` (409) rejects changed durable inputs. Gateway credentials are
 internal and never accepted from public API callers.
+
+## Demo UX (Milestone 9)
+
+- `GET /simulator/assets`: settlement-role-only sanitized asset selector (latest 100).
+- `POST /simulator/events`: `{asset_id, amount_minor, currency, reference, mode}`;
+  mode is `valid` or `invalid`. Requires an enabled sandbox and authorized settlement user.
+- `POST /simulator/events/{id}/replay`: resubmits the caller's exact stored signed event.
+  Other users cannot access the stored event by ID. Bodies/signatures are never returned.
+- `GET /audit/security-events?limit=50&offset=0`: admin-only sanitized security feed.
+- `POST /receivables/{id}/realize`, `/ebrc-eligible`, `/close`: administrator review actions,
+  strict state ordering and ledger authorization required. Eligibility sets local
+  `ebrc_status=SELF_CERTIFICATION_PENDING`; TradeCred never issues a certificate.
+
+Simulator responses include `id`, `event_id`, `asset_id`, `accepted`, `uncertain`, `code`
+and optional ledger receipt/backend. A completed simulation request can return HTTP 200
+with `accepted=false` for a rejected signed event. `uncertain=true` means availability
+prevented confirming the outcome; use the same replay ID to recover. The public settlement
+webhook retains its existing HTTP error semantics. Disabled simulator returns 404; missing
+signing configuration or signer failure returns 503 before any submission.

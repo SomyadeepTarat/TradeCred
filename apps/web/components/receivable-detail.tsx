@@ -1,4 +1,5 @@
 "use client";
+import { LifecycleTimeline } from "./lifecycle-timeline";
 import Link from "next/link";
 import { FinancingPanel } from "./financing-panel";
 import { useEffect, useState } from "react";
@@ -6,19 +7,28 @@ import { api, date, Detail, History, label, money, Registry } from "../lib/api";
 import { ErrorNotice, Status, useApiError, useUser } from "./workspace";
 
 const actionLabels: Record<string, string> = {
+  realize: "Mark realized",
+  "ebrc-eligible": "Mark e-BRC eligibility",
+  close: "Close receivable",
   submit: "Submit for verification",
   verify: "Verify invoice integrity",
   register: "Register receivable",
   "open-financing": "Open for financing",
 };
 const guidance: Record<string, string> = {
+  REALIZED:
+    "Remittance reference is linked. An administrator can mark eligibility for the exporter e-BRC workflow.",
+  EBRC_ELIGIBLE:
+    "Eligible for exporter e-BRC workflow. Self-certification pending. An administrator can close the consortium record.",
+  CLOSED:
+    "The consortium record is closed. No e-BRC certificate was issued by TradeCred.",
   DRAFT: "Review the invoice details, then submit this draft for verification.",
   SUBMITTED:
     "Awaiting administrator verification. An administrator must sign in to complete the review.",
   VERIFIED:
     "Verification is recorded. You can now register this receivable on the selected ledger.",
   REGISTERED:
-    "Registration is recorded. Open the receivable for future financing workflows when ready.",
+    "Registration is recorded. Open the receivable for financing offers when ready.",
   LOCKED:
     "An offer is accepted and this receivable is locked. The assigned institution can record a simulated disbursement.",
   FINANCED:
@@ -324,6 +334,7 @@ export function ReceivableDetail({ id }: { id: string }) {
               </div>
             </div>
           </section>
+          <LifecycleTimeline status={row.status} history={history} />
           <FinancingPanel row={row} onChanged={reload} />
           <div className="detail-grid">
             <section className="panel">
@@ -386,7 +397,12 @@ export function ReceivableDetail({ id }: { id: string }) {
               <section className="panel">
                 <h2>Settlement status</h2>
                 <p>
-                  {row.status === "PAYMENT_CONFIRMED"
+                  {[
+                    "PAYMENT_CONFIRMED",
+                    "REALIZED",
+                    "EBRC_ELIGIBLE",
+                    "CLOSED",
+                  ].includes(row.status)
                     ? "Inward payment confirmed. Remittance reference linked."
                     : "Awaiting a verified signed bank settlement event."}
                 </p>

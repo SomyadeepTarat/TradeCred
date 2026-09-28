@@ -1,4 +1,5 @@
 "use client";
+import { SettlementSimulator } from "./settlement-simulator";
 import Link from "next/link";
 import { FinancierDashboard } from "./financier-dashboard";
 import { useEffect, useState } from "react";
@@ -41,11 +42,7 @@ function ExporterDashboard() {
     return (
       <section className="empty">
         <h1>Your account is connected</h1>
-        <p>
-          The {user.role === "FINANCIER" ? "financier" : "settlement"} workspace
-          is not available in this milestone. Sign out to use an exporter or
-          administrator account.
-        </p>
+        <p>Use the navigation to open the workspace available to your role.</p>
       </section>
     );
   return (
@@ -278,6 +275,7 @@ function ExporterDashboard() {
 
 export function Dashboard() {
   const user = useUser();
+  if (user.role === "SETTLEMENT_OPERATOR") return <SettlementSimulator />;
   return user.role === "FINANCIER" ? (
     <FinancierDashboard />
   ) : (

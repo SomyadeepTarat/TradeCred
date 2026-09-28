@@ -138,11 +138,14 @@ class ReceivableQueries:
             "verify": S.VERIFIED,
             "register": S.REGISTERED,
             "open-financing": S.FINANCE_AVAILABLE,
+            "realize": S.REALIZED,
+            "ebrc-eligible": S.EBRC_ELIGIBLE,
+            "close": S.CLOSED,
         }
         for action, target in candidates.items():
             role_allowed = (
                 self.user.role == Role.ADMIN
-                if action == "verify"
+                if action in {"verify", "realize", "ebrc-eligible", "close"}
                 else self.user.role
                 in (
                     {Role.EXPORTER}

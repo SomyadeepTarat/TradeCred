@@ -100,3 +100,13 @@ configuration. SDK errors are reduced to allowlisted codes; no fallback manufact
 success. Private journal inputs survive rollback and require restricted database access,
 backups and retention. This journal is application-private storage, not a blockchain PDC.
 No live-network privacy or commit guarantees have been validated locally.
+
+## Sandbox simulator boundary (Milestone 9)
+
+The sandbox signer is opt-in and separate from the API. Its token authorizes signing and
+must remain private. The API requires a settlement-role session before contacting it;
+public webhook requests still need a valid asymmetric signature. Invalid/replayed demo
+events exercise the same verification service as external events. Exact event bytes are
+stored privately, and replay is scoped to the submitting user. Audit/security feeds require
+admin access and do not expose raw event bodies, signatures or private invoice amounts.
+The signer is not a production bank authority; disable it outside private demonstrations.

@@ -24,8 +24,9 @@ def test_generated_keys_and_simulator_interoperate_without_overwriting(tmp_path)
     signing = runpy.run_path(str(ROOT / "services/bank-simulator/signing.py"))
     signature = signing["sign"](b'{"eventId":"test"}', private)
     verify_signature(b'{"eventId":"test"}', signature, public)
-    with pytest.raises(SystemExit, match="refusing to overwrite"):
-        main()
+    token_before = (tmp_path / ".env").read_text()
+    main()
+    assert (tmp_path / ".env").read_text() == token_before
     assert private.read_bytes() == original
     with pytest.raises(APIError) as error:
         verify_signature(b'{"eventId":"tampered"}', signature, public)

@@ -1,6 +1,7 @@
 """Run browser acceptance tests against isolated PostgreSQL and temporary PDF storage."""
 
 import asyncio
+import json
 import os
 import signal
 import socket
@@ -15,6 +16,8 @@ from uuid import uuid4
 
 from alembic import command
 from alembic.config import Config
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from dotenv import dotenv_values
 from pypdf import PdfWriter
 from sqlalchemy import create_engine, text
@@ -53,7 +56,7 @@ async def seed(url: str, password: str) -> None:
 
 def main() -> int:
     # Refuse to touch a process already using either dedicated test port.
-    for port in (8001, 3001):
+    for port in (8001, 3001, 8091):
         with socket.socket() as sock:
             sock.bind(("127.0.0.1", port))
     settings = {**dotenv_values(ROOT / ".env"), **os.environ}
@@ -82,6 +85,37 @@ def main() -> int:
             PORT="3001",
             HOSTNAME="127.0.0.1",
         )
+        key = Ed25519PrivateKey.generate()
+        private, public = temp / "bank-private.pem", temp / "bank-public.pem"
+        private.write_bytes(
+            key.private_bytes(
+                serialization.Encoding.PEM,
+                serialization.PrivateFormat.PKCS8,
+                serialization.NoEncryption(),
+            )
+        )
+        public.write_bytes(
+            key.public_key().public_bytes(
+                serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo
+            )
+        )
+        env.update(
+            SIMULATOR_ENABLED="true",
+            SIMULATOR_URL="http://127.0.0.1:8091",
+            SIMULATOR_TOKEN="e2e-sandbox-token-" * 3,
+            SIMULATOR_KEY_ID="demo-bank-1",
+            BANK_PRIVATE_KEY_PATH=str(private),
+            PYTHONPATH=str(API) + os.pathsep + str(ROOT / "services/bank-simulator"),
+            BANK_TRUSTED_KEYS=json.dumps(
+                {
+                    "demo-bank-1": {
+                        "bank_id": "BANK_SETTLEMENT_01",
+                        "organization_id": "ORG_SETTLEMENT_BANK",
+                        "public_key_path": str(public),
+                    }
+                }
+            ),
+        )
         log_path = temp / "servers.log"
         try:
             original = os.environ.get("DATABASE_URL")
@@ -102,6 +136,23 @@ def main() -> int:
             writer.add_metadata({"/Title": "Fictional UI acceptance invoice"})
             writer.write(env["E2E_PDF_PATH"])
             with log_path.open("wb") as log:
+                bank = subprocess.Popen(
+                    [
+                        str(API / ".venv/bin/uvicorn"),
+                        "server:app",
+                        "--host",
+                        "127.0.0.1",
+                        "--port",
+                        "8091",
+                    ],
+                    cwd=API,
+                    env=env,
+                    stdout=log,
+                    stderr=log,
+                    start_new_session=True,
+                )
+                processes.append(bank)
+                wait_ready("http://127.0.0.1:8091/health", bank)
                 api = subprocess.Popen(
                     [
                         str(API / ".venv/bin/uvicorn"),

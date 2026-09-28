@@ -54,3 +54,27 @@ winning financier, submitting bank organization or administrator.
 
 Milestone 6 stops at PAYMENT_CONFIRMED. Realization, eligibility/closure orchestration
 and the browser simulator are not silently performed.
+
+## Browser sandbox (Milestone 9)
+
+`make demo` starts the optional `demo` Compose profile. The signing service mounts only
+`data/bank-keys` read-only. The API mounts public keys only. `make keys` is now idempotent:
+existing complete keypairs are preserved and a random `SIMULATOR_TOKEN` is added to the
+private `.env` only when missing. An incomplete pair still fails without overwriting files.
+
+The browser uses session-authenticated, settlement-role-only `/simulator` APIs. The API
+asks the internal `/sign` service to sign exact event bytes, persists those bytes, then
+passes them through the same signature/nonce/timestamp/amount/state validation service
+used by the public webhook. Invalid-signature mode corrupts the actual signature;
+replay uses the original stored signature and body. No alternate payment-confirmation
+path bypasses verification. Unknown outcomes remain explicitly unknown and can be retried
+using the returned simulator ID. Payloads and signatures never return to the browser.
+
+The signer listens on loopback port 8090 and the private Compose network; its bearer token
+must remain secret. It is an explicitly enabled local sandbox authority, not a real bank.
+`SIMULATOR_ENABLED` defaults false. `make demo` enables it only for that Compose invocation.
+For host development, start the signer from `apps/api` with `PYTHONPATH` including both
+`apps/api` and `services/bank-simulator`, set `BANK_PRIVATE_KEY_PATH`, `SIMULATOR_TOKEN`,
+then run `uv run uvicorn server:app --host 127.0.0.1 --port 8090`. Configure the API's
+public key registry, `SIMULATOR_ENABLED=true` and `SIMULATOR_URL=http://127.0.0.1:8090`.
+Remote signer URLs require HTTPS. No private key is needed in the browser or API process.

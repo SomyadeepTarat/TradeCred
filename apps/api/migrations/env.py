@@ -3,6 +3,7 @@ import asyncio
 from alembic import context
 from sqlalchemy import Connection
 
+import app.models.simulator  # noqa: F401
 from app.core.config import Settings
 from app.core.database import create_database_engine
 from app.models import (

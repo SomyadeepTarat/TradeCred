@@ -1,0 +1,5 @@
+*
+!services/
+!services/bank-simulator/
+!services/bank-simulator/server.py
+!services/bank-simulator/signing.py

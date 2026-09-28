@@ -153,3 +153,14 @@ stores a request hash and sanitized receipt with the chaincode mutation. Postgre
 survive local projection rollback. Exact receipt/current-state matching permits recovery;
 changed requests fail. Existing assets bind to backend/network and cannot silently move
 between mock and Drunix. See [network guide](../blockchain/network/README.md).
+
+## Demo screens and sandbox signing (Milestone 9)
+
+The browser gateway exposes authenticated registry checking, admin audit and settlement
+simulator routes. A separate local signer holds the sandbox private key; the API retains
+only its public verifier registry and internal signer token. Exact signed events are stored
+in `simulator_events` for replay, scoped to their submitting user. Simulator execution uses
+SettlementService, so all existing signature, timestamp, replay and ledger checks apply.
+Administrator review exposes the final three existing ledger transitions. Seed fixtures
+run through public application APIs, generating genuine mock ledger history, agreements,
+disbursement records and signature-verified settlement rather than editing status columns.

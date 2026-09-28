@@ -1,21 +1,23 @@
 # TradeCred
 
 Receivable trust infrastructure for MSME trade finance, targeting NPCI Drunix.
-[The PRD](tradecred_prd_codex.md) is the source of truth. **Milestones 0–5 are implemented.**
+[The PRD](tradecred_prd_codex.md) is the source of truth. **Milestones 0–9 are implemented.**
 
 Fragmented institutional records create duplicate-financing and reconciliation risk.
-The planned solution combines deterministic fingerprints, a shared registry, financing
-locks, agreement hashes and authenticated settlement records. Financing uses explicit mock ledger and payment adapters. Signed bank settlement events are verified with Ed25519. Exporters can now create
+The application combines deterministic fingerprints, a shared registry, financing
+locks, agreement hashes and authenticated settlement records. The ledger backend is configurable; payments remain explicit sandbox simulations. Signed bank settlement events are verified with Ed25519. Exporters can now create
 drafts by uploading PDFs with deterministic invoice fingerprints and integrity hashes, then submit,
 verify (as admin), register, and open them for financing in the explicit mock ledger.
 
 ## Implemented architecture
 
 ```text
-Browser --> Next.js :3000 (exporter UI + same-origin session gateway)
+Browser --> Next.js :3000 (role workspaces + same-origin session gateway)
 API client --> FastAPI :8000 --> PostgreSQL 16 :5432
                   | JWT / Argon2 / role checks
                   | organizations / users / receivable schema
+                  |--> explicit MockLedgerClient or Drunix gateway
+                  |--> sandbox signer :8090 (private key, optional demo profile)
 ```
 
 Implemented: liveness/readiness, organization/user/receivable/document SQL models, Alembic migrations,
@@ -64,7 +66,7 @@ default (`JWT_ACCESS_TOKEN_MINUTES`, allowed range 1–60).
 `POSTGRES_*` configure Compose. `DATABASE_URL` configures host-side API/migration/seed
 commands; use `postgresql+psycopg://`. Compose overrides the API's database host to
 `postgres`. Existing volumes retain their original PostgreSQL credentials.
-Drunix and bank settings remain reserved in `.env.example`.
+Drunix and sandbox bank settings are documented in `.env.example` and their service guides.
 
 ## Demo identities and authentication
 
@@ -119,8 +121,8 @@ localhost. Both API and web containers run without root. Health endpoints:
 - `LEDGER_BACKEND=drunix` selects the authenticated Fabric Gateway bridge. Missing configuration,
   connection failures or unconfirmed commits fail closed with 503; there is no silent fallback.
   Live Drunix compatibility is unverified. See [network setup](blockchain/network/README.md).
-- `make demo` and `make reset` deliberately exit nonzero until
-  their real implementations arrive. Payments remain explicit simulations; settlement consumes signed bank events.
+- `make demo` starts the sandbox demo and seeds fixtures through API workflows.
+  `make reset` remains Milestone 10. Payments remain explicit simulations; settlement consumes signed bank events.
 - Authentication has no registration, password-reset, refresh-token, or logout-revocation
   flow. Login rate limiting and broader security audit logging remain hardening work. Keep the
   development stack private. Deactivated users lose access immediately.
@@ -296,8 +298,8 @@ Expected: invalid signature rejected, valid event confirms payment, replay rejec
 Refresh the asset to view PAYMENT_CONFIRMED and recorded ledger history. No funds move.
 The full invoice amount is required, not the advance amount; no FX conversion is assumed.
 See [simulator setup and protocol](services/bank-simulator/README.md) for host API
-configuration, key custody and retry semantics. Browser simulator and downstream
-realization/e-BRC/closure orchestration remain later work.
+configuration, key custody and retry semantics. The browser simulator and administrator realization/e-BRC eligibility/closure controls
+are available in Milestone 9.
 
 
 ## Go chaincode (Milestone 7)
@@ -330,3 +332,22 @@ See [setup and deployment](blockchain/network/README.md) and the
 Run `make migrate`, `make test`, `make test-integration`, `make lint`, and `make test-e2e`.
 `make build-gateway` builds the bridge; `docker compose --profile drunix build drunix-gateway`
 builds its optional container. The default stack remains explicitly mock.
+
+
+## Demo UX (Milestone 9)
+
+Run `make demo`, then open http://localhost:3000. This starts the optional signer, preserves
+keys and existing credentials, and seeds four fictional receivables through normal API
+workflows. No manual database edits are needed. Run `make seed-fixtures` to resume fixture
+setup without resetting advanced records; `make seed` still creates identities only.
+
+- **Registry checker**: invoice metadata → sanitized duplicate/eligibility result.
+- **Settlement simulator**: settlement-role only; valid signature, invalid signature and
+  exact event replay. Private signing keys stay in the separate local signer service.
+- **Audit & security**: admin-only activity and webhook rejection feeds.
+- **Receivable journey**: recorded lifecycle steps through REALIZED, EBRC_ELIGIBLE and CLOSED.
+
+Follow [all three demo scenarios](docs/demo-script.md). See the
+[Milestone 9 report](docs/milestone-9.md) for changed files and verification.
+`make test-e2e` starts isolated API/web/signer servers on ports 8001/3001/8091.
+Live Drunix deployment is still unverified; the demo uses explicitly configured mock mode.

@@ -33,12 +33,14 @@ class Settings(BaseSettings):
     drunix_chaincode_name: str = "tradecred"
     drunix_timeout_seconds: int = Field(default=55, ge=50, le=120)
 
-    @field_validator("drunix_gateway_token", "drunix_gateway_ca_path", mode="before")
+    @field_validator(
+        "drunix_gateway_token", "drunix_gateway_ca_path", "simulator_token", mode="before"
+    )
     @classmethod
     def empty_optional(cls, value: object) -> object:
         return None if value == "" else value
 
-    @field_validator("drunix_gateway_url")
+    @field_validator("drunix_gateway_url", "simulator_url")
     @classmethod
     def gateway_url(cls, value: str) -> str:
         if not value:
@@ -48,10 +50,16 @@ class Settings(BaseSettings):
             raise ValueError("Gateway URL must be an origin without credentials")
         if url.scheme != "https" and not (
             url.scheme == "http"
-            and url.hostname in {"127.0.0.1", "localhost", "::1", "drunix-gateway"}
+            and url.hostname
+            in {"127.0.0.1", "localhost", "::1", "drunix-gateway", "bank-simulator"}
         ):
             raise ValueError("Remote gateway connections require HTTPS")
         return value
+
+    simulator_enabled: bool = False
+    simulator_url: str = "http://127.0.0.1:8090"
+    simulator_token: SecretStr | None = Field(default=None, min_length=32)
+    simulator_key_id: str = "demo-bank-1"
 
     jwt_secret: SecretStr = Field(min_length=32)
     jwt_access_token_minutes: int = Field(default=30, ge=1, le=60)

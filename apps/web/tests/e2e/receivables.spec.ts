@@ -117,7 +117,7 @@ test("exporter creates, admin verifies, exporter registers and checks history", 
   await expect(page.getByLabel("Invoice number")).toHaveValue("E2E-2026-1042");
   expect(errors).toEqual([]);
 });
-test("expired session returns to login and unsupported role has no exporter controls", async ({
+test("expired session returns to login and settlement operator has no exporter controls", async ({
   page,
   context,
 }) => {
@@ -127,7 +127,7 @@ test("expired session returns to login and unsupported role has no exporter cont
   await expect(page).toHaveURL("/login");
   await login(page, "settlement");
   await expect(
-    page.getByRole("heading", { name: "Your account is connected" }),
+    page.getByRole("heading", { name: "Settlement simulator" }),
   ).toBeVisible();
   await expect(
     page.getByRole("link", { name: /Create receivable/ }),

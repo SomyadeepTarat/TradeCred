@@ -69,7 +69,7 @@ test("missing session and cross-origin writes never contact backend", async () =
 });
 test("gateway refuses unimplemented endpoints and path traversal", async () => {
   expect(
-    (await gateway(request("audit/events"), ["audit", "events"])).status,
+    (await gateway(request("admin/delete"), ["admin", "delete"])).status,
   ).toBe(404);
   expect((await gateway(request("auth/me"), ["..", "auth", "me"])).status).toBe(
     404,

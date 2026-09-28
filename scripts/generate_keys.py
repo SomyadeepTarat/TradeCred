@@ -2,6 +2,7 @@
 
 import json
 import os
+import secrets
 from pathlib import Path
 
 from cryptography.hazmat.primitives import serialization
@@ -11,12 +12,25 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def main() -> None:
+    env_path = ROOT / ".env"
+    from dotenv import dotenv_values
+
+    values = dotenv_values(env_path)
+    if not values.get("SIMULATOR_TOKEN"):
+        lines = env_path.read_text().splitlines() if env_path.exists() else []
+        lines = [line for line in lines if not line.startswith("SIMULATOR_TOKEN=")]
+        lines.append("SIMULATOR_TOKEN=" + secrets.token_hex(32))
+        env_path.write_text("\n".join(lines) + "\n")
+        env_path.chmod(0o600)
     directory = ROOT / "data" / "bank-keys"
     directory.mkdir(parents=True, exist_ok=True, mode=0o700)
     private_path = directory / "bank-private.pem"
     public_dir = ROOT / "data" / "bank-public"
     public_dir.mkdir(parents=True, exist_ok=True)
     public_path = public_dir / "bank-public.pem"
+    if private_path.exists() and public_path.exists():
+        print("Existing signing keys preserved; simulator token is configured.")
+        return
     if private_path.exists() or public_path.exists():
         raise SystemExit("Keys already exist; refusing to overwrite. See bank-simulator/README.md.")
     key = Ed25519PrivateKey.generate()

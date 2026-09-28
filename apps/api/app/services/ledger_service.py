@@ -131,8 +131,15 @@ class LedgerService:
             raise
 
     async def _advance(self, receivable_id: UUID, target: Status) -> LifecycleResponse:
-        if target == Status.VERIFIED and self.actor.role != Role.ADMIN:
-            raise APIError(403, "UNAUTHORIZED_ROLE", "Only an administrator may verify invoices.")
+        if (
+            target in {Status.VERIFIED, Status.REALIZED, Status.EBRC_ELIGIBLE, Status.CLOSED}
+            and self.actor.role != Role.ADMIN
+        ):
+            raise APIError(
+                403,
+                "UNAUTHORIZED_ROLE",
+                "An administrator is required for verification and post-settlement review.",
+            )
         if (
             target in {Status.SUBMITTED, Status.FINANCE_AVAILABLE}
             and self.actor.role != Role.EXPORTER
@@ -181,7 +188,12 @@ class LedgerService:
                     due_date=row.due_date,
                 )
             )
-        elif target == Status.FINANCE_AVAILABLE:
+        elif target in {
+            Status.FINANCE_AVAILABLE,
+            Status.REALIZED,
+            Status.EBRC_ELIGIBLE,
+            Status.CLOSED,
+        }:
             if row.asset_id is None:
                 raise APIError(409, "ASSET_NOT_REGISTERED", "Register the receivable first.")
             ledger = create_ledger_client(self.session, self.settings, self.actor)
@@ -198,7 +210,9 @@ class LedgerService:
             row.asset_id = receipt.asset.asset_id
             row.owner_org_id = receipt.asset.owner_org_id
             row.financing_agreement_hash = receipt.asset.agreement_hash
-        if receipt is None or not receipt.replayed:
+        if target == Status.EBRC_ELIGIBLE:
+            row.ebrc_status = "SELF_CERTIFICATION_PENDING"
+        if receipt is None or not receipt.replayed or previous != row.status:
             metadata = {"fromStatus": previous.value, "toStatus": row.status.value}
             if receipt:
                 metadata.update(backend=receipt.asset.backend, transactionId=receipt.transaction_id)
@@ -207,6 +221,9 @@ class LedgerService:
                 Status.VERIFIED: "RECEIVABLE_VERIFIED",
                 Status.REGISTERED: "RECEIVABLE_REGISTERED",
                 Status.FINANCE_AVAILABLE: "RECEIVABLE_OPENED",
+                Status.REALIZED: "RECEIVABLE_REALIZED",
+                Status.EBRC_ELIGIBLE: "EBRC_ELIGIBILITY_RECORDED",
+                Status.CLOSED: "RECEIVABLE_CLOSED",
             }[target]
             self._audit(event, receivable=row, metadata=metadata)
         result = LifecycleResponse(

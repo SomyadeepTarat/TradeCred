@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.api.routes.auth import router as auth_router
+from app.api.routes.demo import router as demo_router
 from app.api.routes.financing import router as financing_router
 from app.api.routes.health import router
 from app.api.routes.ledger import router as ledger_router
@@ -30,7 +31,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         finally:
             await engine.dispose()
 
-    application = FastAPI(title="TradeCred API", version="0.8.0", lifespan=lifespan)
+    application = FastAPI(title="TradeCred API", version="0.9.0", lifespan=lifespan)
     application.include_router(router, prefix="/api/v1")
     application.include_router(auth_router, prefix="/api/v1")
     application.include_router(organizations_router, prefix="/api/v1")
@@ -39,6 +40,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     application.include_router(ledger_router, prefix="/api/v1")
     application.include_router(financing_router, prefix="/api/v1")
     application.include_router(settlement_router, prefix="/api/v1")
+    application.include_router(demo_router, prefix="/api/v1")
     application.add_middleware(RequestIdMiddleware)
     application.add_exception_handler(APIError, api_error_handler)
     return application

@@ -176,5 +176,80 @@ test("two institutions offer, one is accepted and only that institution can simu
   );
   expect(second.status()).toBe(409);
   expect((await second.json()).error.code).toBe("RECEIVABLE_ALREADY_FINANCED");
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.getByRole("link", { name: /Registry checker/ }).click();
+  await page.getByLabel("Invoice number").fill("E2E-FINANCE-001");
+  await page.getByRole("button", { name: "Check registry" }).click();
+  await expect(
+    page.getByText("Duplicate receivable already financed.", { exact: true }),
+  ).toBeVisible();
+  await page.screenshot({
+    path: testInfo.outputPath("registry-blocked.png"),
+    fullPage: true,
+  });
+  const row = await request.get(
+    `http://127.0.0.1:8001/api/v1/receivables/${id}`,
+    { headers: exporter },
+  );
+  const asset = (await row.json()).asset_id;
+  await page.getByRole("button", { name: "Sign out" }).click();
+  await signIn(page, "settlement");
+  await page.getByLabel("Asset", { exact: true }).selectOption(asset);
+  await page.getByRole("button", { name: "Send Invalid Signature" }).click();
+  await expect(
+    page.getByText("SIGNATURE REJECTED", { exact: true }),
+  ).toBeVisible();
+  const unchanged = await request.get(
+    `http://127.0.0.1:8001/api/v1/receivables/${id}`,
+    { headers: exporter },
+  );
+  expect((await unchanged.json()).status).toBe("FINANCED");
+  await page.getByRole("button", { name: "Send Valid Signed Event" }).click();
+  await expect(
+    page.getByText("PAYMENT CONFIRMED", { exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Replay Event" }).click();
+  await expect(
+    page.getByText("PAYMENT EVENT REPLAY", { exact: true }),
+  ).toBeVisible();
+  await page.screenshot({
+    path: testInfo.outputPath("settlement-replay.png"),
+    fullPage: true,
+  });
+  await page.getByRole("button", { name: "Sign out" }).click();
+  await signIn(page, "admin");
+  await page.goto(detail);
+  for (const name of [
+    "Mark realized",
+    "Mark e-BRC eligibility",
+    "Close receivable",
+  ]) {
+    await page.getByRole("button", { name, exact: true }).click();
+    await expect(page.getByRole("button", { name, exact: true })).toHaveCount(
+      0,
+    );
+  }
+  await expect(page.locator(".journey [aria-current=step]")).toContainText(
+    "Closed",
+  );
+  await expect(page.getByText(/SELF_CERTIFICATION_PENDING/)).toBeVisible();
+  await page.screenshot({
+    path: testInfo.outputPath("closed-timeline.png"),
+    fullPage: true,
+  });
+  await page.getByRole("link", { name: /Audit & security/ }).click();
+  await expect(
+    page.getByText("INVALID_PAYMENT_SIGNATURE", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("PAYMENT_EVENT_REPLAY", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Receivable closed", { exact: true }),
+  ).toBeVisible();
+  await page.screenshot({
+    path: testInfo.outputPath("audit-security.png"),
+    fullPage: true,
+  });
   expect(errors).toEqual([]);
 });

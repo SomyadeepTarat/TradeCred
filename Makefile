@@ -30,17 +30,17 @@ test-integration:
 	$(API) pytest -m integration
 
 lint: lint-chaincode lint-gateway
-	$(API) ruff check . ../../scripts/seed_demo.py ../../scripts/test_ui.py ../../scripts/generate_keys.py ../../services/bank-simulator
-	$(API) ruff format --check . ../../scripts/seed_demo.py ../../scripts/test_ui.py ../../scripts/generate_keys.py ../../services/bank-simulator
+	$(API) ruff check . ../../scripts/seed_demo.py ../../scripts/seed_fixtures.py ../../scripts/test_ui.py ../../scripts/generate_keys.py ../../services/bank-simulator
+	$(API) ruff format --check . ../../scripts/seed_demo.py ../../scripts/seed_fixtures.py ../../scripts/test_ui.py ../../scripts/generate_keys.py ../../services/bank-simulator
 	$(API) mypy app
 	$(WEB) run lint
 	$(WEB) run typecheck
 	$(WEB) run format:check
 
 format: format-chaincode format-gateway
-	$(API) ruff format . ../../scripts/seed_demo.py ../../scripts/test_ui.py ../../scripts/generate_keys.py ../../services/bank-simulator
-	$(API) ruff check --fix . ../../scripts/seed_demo.py ../../scripts/test_ui.py ../../scripts/generate_keys.py ../../services/bank-simulator
-	$(API) ruff format . ../../scripts/seed_demo.py ../../scripts/test_ui.py ../../scripts/generate_keys.py ../../services/bank-simulator
+	$(API) ruff format . ../../scripts/seed_demo.py ../../scripts/seed_fixtures.py ../../scripts/test_ui.py ../../scripts/generate_keys.py ../../services/bank-simulator
+	$(API) ruff check --fix . ../../scripts/seed_demo.py ../../scripts/seed_fixtures.py ../../scripts/test_ui.py ../../scripts/generate_keys.py ../../services/bank-simulator
+	$(API) ruff format . ../../scripts/seed_demo.py ../../scripts/seed_fixtures.py ../../scripts/test_ui.py ../../scripts/generate_keys.py ../../services/bank-simulator
 	$(WEB) run format
 
 build:
@@ -52,8 +52,14 @@ migrate:
 seed:
 	uv run --frozen --project apps/api python scripts/seed_demo.py
 
-demo reset:
-	@echo "$@ is not available in Milestone 8; see README.md for milestone scope."
+demo:
+	bash scripts/run_demo.sh
+
+seed-fixtures:
+	uv run --frozen --project apps/api python scripts/seed_fixtures.py
+
+reset:
+	@echo "reset is reserved for Milestone 10; existing demo data is preserved."
 	@exit 2
 
 test-e2e: build
